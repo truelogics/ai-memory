@@ -1,0 +1,59 @@
+---
+doc: README
+audience: [human, agent]
+status: living
+owner: ai-memory
+last_reviewed: 2026-07-30
+---
+
+# AI Memory
+
+## What is this?
+
+A persistent context layer for agents. It ingests engineering docs, decisions,
+and conventions so AI systems can remember, enforce, and assist across sessions.
+
+## Why does it exist?
+
+Agents start fresh every session. Knowledge lives in scattered docs and people's
+heads. AI Memory turns `engineering/` (and related repos) into queryable memory
+agents can load on demand.
+
+## Who is it for?
+
+- Agents that need durable context (review, codegen, onboarding)
+- Engineers building or integrating agent tooling
+- Anyone defining how memory is ingested and queried
+
+## Current status
+
+**Planning** — documentation only. No implementation yet.
+
+## Roadmap
+
+See [`ROADMAP.md`](ROADMAP.md). Summary:
+
+| Phase | Focus |
+|-------|--------|
+| 0 (now) | Docs, RFC-0001, data model |
+| 1 | MVP ingest + index + query |
+| 2 | Roadmap ingest, agent/MCP integration |
+| 3 | Multi-repo, embeddings, observability |
+
+Tracked company-wide in [`roadmap/NOW.md`](../roadmap/NOW.md).
+
+## Contributing
+
+1. Read [`VISION.md`](VISION.md) and [`docs/data-model.md`](docs/data-model.md)
+2. Significant design → open an RFC under `RFC/` (start with RFC-0001)
+3. Org-wide decisions also land in [`engineering/ADR/`](../engineering/ADR/)
+
+Code dirs (`cmd/`, `internal/`, `pkg/`, `tests/`) are reserved — no code yet.
+
+## Related repos
+
+| Repo | Role |
+|------|------|
+| [`engineering/`](../engineering/) | Source docs & rules consumed by memory |
+| [`roadmap/`](../roadmap/) | Company priorities |
+| [`vision/`](../vision/) | Company north star |
