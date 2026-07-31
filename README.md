@@ -3,12 +3,17 @@ doc: README
 audience: [human, agent]
 status: living
 owner: ai-memory
-last_reviewed: 2026-07-30
+last_reviewed: 2026-08-01
 ---
 
 # AI Memory
 
 ## What is this?
+
+The kernel of the [AI Engineering OS](../vision/README.md). Mission: store,
+organize, retrieve, and connect engineering knowledge. Everything else in the
+OS (context, intelligence, workflows) gets built on top of this, the same way
+an OS grows outward from a kernel — it doesn't start as one.
 
 A persistent context layer for agents. It ingests engineering docs, decisions,
 and conventions so AI systems can remember, enforce, and assist across sessions.
