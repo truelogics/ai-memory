@@ -14,12 +14,14 @@ import (
 
 	"github.com/truelogics/ai-memory/internal/chunker"
 	fscollector "github.com/truelogics/ai-memory/internal/collector/filesystem"
+	"github.com/truelogics/ai-memory/internal/contextbuilder"
 	"github.com/truelogics/ai-memory/internal/domain"
 	"github.com/truelogics/ai-memory/internal/graph"
 	"github.com/truelogics/ai-memory/internal/indexer"
 	"github.com/truelogics/ai-memory/internal/kernel"
 	"github.com/truelogics/ai-memory/internal/normalizer"
 	mdparser "github.com/truelogics/ai-memory/internal/parser/markdown"
+	"github.com/truelogics/ai-memory/internal/retriever"
 	"github.com/truelogics/ai-memory/internal/search"
 	"github.com/truelogics/ai-memory/internal/storage/sqlite"
 )
@@ -225,6 +227,37 @@ func Search(ctx context.Context, dir, query string, out io.Writer) error {
 			fmt.Fprintf(out, "   related: %s\n", strings.Join(names, ", "))
 		}
 	}
+	return nil
+}
+
+// Context implements `eng context --task "<description>"` (Step 8's
+// Definition of Done) and `eng ask <question>` (CLI.md's original
+// design) — the same Retriever -> ContextBuilder pipeline either way; a
+// "task" and a "question" are the same input shape as far as Retriever
+// is concerned (ARCHITECTURE.md's Retriever docs).
+func Context(ctx context.Context, dir, task string, out io.Writer) error {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("context: %w", err)
+	}
+
+	store, err := openStore(absDir, false)
+	if err != nil {
+		return fmt.Errorf("context: %w", err)
+	}
+	defer store.Close()
+
+	hybrid := &search.Search{Storage: store, Graph: graph.New(store)}
+	bundle, err := retriever.New(hybrid).Retrieve(ctx, task)
+	if err != nil {
+		return fmt.Errorf("context: %w", err)
+	}
+	assembled, err := contextbuilder.New().Build(ctx, bundle)
+	if err != nil {
+		return fmt.Errorf("context: %w", err)
+	}
+
+	fmt.Fprintln(out, assembled.Body)
 	return nil
 }
 

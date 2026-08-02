@@ -123,11 +123,18 @@ $ eng search "authentication"
    "...authentication is handled by..."
 ```
 
-### `eng ask "<question>"`
+### `eng ask "<question>"` (also `eng context --task "<description>"`)
 
 **Purpose:** Retriever bundle for a natural-language question — groups
 `eng search` results into labeled sections. No LLM, no generated prose (see
 [`../architecture/ARCHITECTURE.md`](../architecture/ARCHITECTURE.md)'s Retriever).
+Implemented in Step 8's Milestone 6. `eng context --task "..."` is the same
+pipeline under Step 8's Definition of Done's command name — a task
+("Review authentication PR") and a question are the same input shape to
+`Retriever`, so both call `internal/cli.Context`. Group labels actually
+shipped: Architecture, Related ADRs, Rules, Related RFCs, Roadmap,
+Documentation, Related Issues, Related PRs (the last two always present,
+always empty — nothing ingests those yet).
 
 **Arguments:** `question` (required, positional)
 

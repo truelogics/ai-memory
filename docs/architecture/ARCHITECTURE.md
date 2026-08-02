@@ -149,40 +149,43 @@ files. "Related" tries explicit Relationships first, then falls back to
 documents sharing a non-structural Tag. This is what `eng search` calls
 directly.
 
-### Retriever (not implemented in Step 7 — interface only, `kernel.Retriever`)
+### Retriever (`internal/retriever`)
 
-Gathers everything relevant for a task — not just a search query. v1's only
-task shape is a natural-language question (`eng ask`): extract keywords,
-call Search with them, group and de-duplicate the results into a labeled
-bundle (e.g. "Architecture docs", "ADRs", "Related PRs" — PRs empty until
-Milestone 2 ingests them). No generation, no synthesis of a prose answer —
-the value is better *assembly* of what Search already found, not new
-intelligence. A broader task shape (e.g. "review PR #123") is where this is
-headed, not implemented in v1. Step 7 scoped implementation to `init`,
-`index`, `search`, `status` only — `eng ask` and a concrete Retriever are
-future work.
+Gathers everything relevant for a task — not just a search query.
+Implemented in Step 8's Milestone 6: turns a free-text task ("Review
+authentication PR") into an FTS query (stopwords dropped, remaining terms
+OR'd — a bareword multi-term match is an implicit AND, too strict for a
+natural sentence), searches via the hybrid `Search`, and groups results by
+Knowledge Type into a labeled bundle (Architecture, Related ADRs, Rules,
+Related RFCs, Roadmap, Documentation). "Related Issues"/"Related PRs" are
+always present but empty — RFC-0001's non-goals mean nothing ingests those
+yet, and showing an empty section says so explicitly instead of silently
+omitting it. No generation, no synthesis of a prose answer — the value is
+better *assembly* of what Search already found, not new intelligence.
 
-### Context Builder (not implemented in Step 7 — interface only, `kernel.ContextBuilder`)
+### Context Builder (`internal/contextbuilder`)
 
-Packages a `Retriever` bundle into whatever a consumer needs. v1's only
-consumer is a terminal, so this would be thin: formatting the bundle as
-readable CLI output. This is the seam where Milestone 3's LLM layer plugs
-in later — it calls `Context Builder` for a packaged prompt instead of
-formatting `Retriever`'s bundle itself, so `Retriever` never has to know or
-care what its output gets turned into. Not implemented in Step 7 for the
-same reason as Retriever.
+Packages a `Retriever` bundle into whatever a consumer needs. Implemented
+in Milestone 6, and deliberately thin: v1's only consumer is a terminal, so
+`Build` formats the bundle as readable text (`eng context`/`eng ask`'s
+output) — including printing "(none indexed yet)" for empty sections
+rather than dropping them. This is the seam where a future AI layer plugs
+in later — it would call `Context Builder` for a packaged prompt instead
+of formatting `Retriever`'s bundle itself, so `Retriever` never has to
+know or care what its output gets turned into.
 
 ### CLI (`cmd/eng`, `internal/cli`)
 
 Thin layer translating commands into calls against the components above,
 plus formatting output for a terminal — the actual translation logic lives
 in `internal/cli` so it's testable without spawning the binary; `cmd/eng`
-just parses `os.Args` and calls in. Of the seven commands in
-[`CLI.md`](../cli/CLI.md), four are implemented (`init`, `index`, `search`,
-`status` — Step 7's Definition of Done); `add`, `ask`, `doctor` print "not
-yet implemented" and exit non-zero. No business logic lives in `cmd/eng`
-itself — if it were deleted and replaced with an HTTP handler tomorrow,
-none of the components above would change.
+just parses `os.Args` and calls in. Of the eight commands in
+[`CLI.md`](../cli/CLI.md) plus `eng context` (Milestone 6, not in the
+original seven), six are implemented (`init`, `index`, `sync`, `search`,
+`status`, `ask`/`context`); `add`, `doctor` print "not yet implemented" and
+exit non-zero. No business logic lives in `cmd/eng` itself — if it were
+deleted and replaced with an HTTP handler tomorrow, none of the components
+above would change.
 
 ## Non-goals reflected in this design
 

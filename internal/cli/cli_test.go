@@ -215,3 +215,43 @@ func TestSyncWithoutInitFails(t *testing.T) {
 		t.Fatal("Sync: expected error when no workspace has been initialized")
 	}
 }
+
+// TestContextEndToEnd exercises `eng context`/`eng ask`'s full pipeline —
+// Milestone 6 — matching Step 8's Definition of Done shape.
+func TestContextEndToEnd(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	writeFile(t, dir, "ARCHITECTURE.md", "---\ndoc: ARCHITECTURE\n---\n\n# Architecture\n\nThe authentication pipeline.\n")
+	writeFile(t, dir, "engineering/ADR/0003-jwt.md", "# ADR 0003\n\nAuthentication decision: use JWT.\n")
+
+	var out bytes.Buffer
+	if err := Init(ctx, dir, &out); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if err := Index(ctx, dir, &out); err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+
+	out.Reset()
+	if err := Context(ctx, dir, "Review authentication PR", &out); err != nil {
+		t.Fatalf("Context: unexpected error: %v", err)
+	}
+	body := out.String()
+	if !strings.Contains(body, "Architecture:") || !strings.Contains(body, "ARCHITECTURE.md") {
+		t.Errorf("Context output = %q, want an Architecture section with ARCHITECTURE.md", body)
+	}
+	if !strings.Contains(body, "Related ADRs:") || !strings.Contains(body, "0003-jwt.md") {
+		t.Errorf("Context output = %q, want a Related ADRs section with the ADR", body)
+	}
+	if !strings.Contains(body, "Related Issues:") || !strings.Contains(body, "none indexed yet") {
+		t.Errorf("Context output = %q, want an empty Related Issues section, not omitted", body)
+	}
+}
+
+func TestContextWithoutInitFails(t *testing.T) {
+	dir := t.TempDir()
+	var out bytes.Buffer
+	if err := Context(context.Background(), dir, "anything", &out); err == nil {
+		t.Fatal("Context: expected error when no workspace has been initialized")
+	}
+}

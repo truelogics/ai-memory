@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -39,7 +40,22 @@ func main() {
 		err = cli.Search(ctx, ".", strings.Join(args, " "), os.Stdout)
 	case "status":
 		err = cli.Status(ctx, firstArgOr(args, "."), os.Stdout)
-	case "add", "ask", "doctor":
+	case "ask":
+		if len(args) == 0 {
+			fmt.Fprintln(os.Stderr, "usage: eng ask <question>")
+			os.Exit(1)
+		}
+		err = cli.Context(ctx, ".", strings.Join(args, " "), os.Stdout)
+	case "context":
+		fs := flag.NewFlagSet("context", flag.ExitOnError)
+		task := fs.String("task", "", "the task to gather context for")
+		fs.Parse(args)
+		if strings.TrimSpace(*task) == "" {
+			fmt.Fprintln(os.Stderr, `usage: eng context --task "<description>"`)
+			os.Exit(1)
+		}
+		err = cli.Context(ctx, ".", *task, os.Stdout)
+	case "add", "doctor":
 		fmt.Fprintf(os.Stderr, "eng %s: not yet implemented (see docs/cli/CLI.md)\n", cmd)
 		os.Exit(1)
 	default:
@@ -73,7 +89,9 @@ Commands:
   sync [path]     incremental re-index using git (default: current directory)
   search <query>  ranked full-text search
   status [path]   report index health
+  ask <question>  gather context for a question (Retriever + Context Builder)
+  context --task "<description>"   same as ask, task-shaped instead of a question
 
 Planned, not yet implemented (see docs/cli/CLI.md):
-  add, ask, doctor`)
+  add, doctor`)
 }
