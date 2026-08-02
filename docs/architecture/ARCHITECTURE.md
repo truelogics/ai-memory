@@ -8,8 +8,12 @@ last_reviewed: 2026-08-01
 
 # Architecture
 
-> Companion to [RFC-0001](../../rfcs/0001-engineering-memory-kernel.md). This
-> describes the v1 kernel only — no AI, no embeddings, no agents.
+> Companion to [RFC-0001](../../rfcs/0001-engineering-memory-kernel.md) and
+> [KNOWLEDGE_MODEL.md](KNOWLEDGE_MODEL.md). This describes the v1 kernel
+> only — no AI, no embeddings, no agents. KNOWLEDGE_MODEL.md's Lifecycle
+> section maps its `Collect`/`Normalize` stages onto this pipeline — both are
+> effectively no-ops in v1 since the only Source is a local git repo and the
+> only format is markdown.
 
 ## Pipeline
 

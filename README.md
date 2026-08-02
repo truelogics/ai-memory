@@ -47,6 +47,8 @@ place to check what's next, not two that can drift out of sync.
 ## Contributing
 
 1. Read [`RFC-0001`](rfcs/0001-engineering-memory-kernel.md),
+   [`KNOWLEDGE_MODEL.md`](docs/architecture/KNOWLEDGE_MODEL.md) (start here —
+   what Engineering Knowledge actually is),
    [`ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md),
    [`DOMAIN_MODEL.md`](docs/architecture/DOMAIN_MODEL.md),
    [`DATABASE.md`](docs/architecture/DATABASE.md), and
@@ -76,7 +78,7 @@ ai-memory/
 ├── go.mod
 ├── rfcs/               ← design proposals (0001: Engineering Memory Kernel)
 ├── docs/
-│   ├── architecture/   ← ARCHITECTURE.md, DOMAIN_MODEL.md, DATABASE.md
+│   ├── architecture/   ← KNOWLEDGE_MODEL.md, ARCHITECTURE.md, DOMAIN_MODEL.md, DATABASE.md
 │   ├── cli/            ← CLI.md
 │   └── api/ storage/ search/ sdk/ plugins/ examples/   ← reserved
 ├── cmd/eng/            ← CLI entrypoint (`eng version` only, so far)

@@ -70,7 +70,9 @@ Every one of these is real future work. None of it is this RFC.
 
 ### Domain model
 
-Full definitions live in [`DOMAIN_MODEL.md`](../docs/architecture/DOMAIN_MODEL.md). Summary of
+Full definitions live in [`DOMAIN_MODEL.md`](../docs/architecture/DOMAIN_MODEL.md) —
+the v1-scoped slice of the general graph model in
+[`KNOWLEDGE_MODEL.md`](../docs/architecture/KNOWLEDGE_MODEL.md). Summary of
 entities and which ship in v1:
 
 | Entity | v1 (MVP) | Later |

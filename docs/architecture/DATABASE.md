@@ -146,3 +146,12 @@ so `eng status` has something real to report.
   repo gets an entirely separate database file. RFC-0001 leaves this open;
   this schema assumes one Workspace-wide file (simpler joins for
   `relationships` across repos), but that's a default, not a decision.
+- **`documents.repository_id` assumes Source = Repository.**
+  [`KNOWLEDGE_MODEL.md`](KNOWLEDGE_MODEL.md) generalizes Repository to
+  Source (git today, Slack/Jira/Notion later). Renaming the column, or
+  leaving it as a v1-specific name until a second Source type actually
+  exists, is undecided — flagged there, not resolved here.
+- **`relationships.from_document_id`/`to_document_id` assume both ends are
+  Documents.** Once Component/Service/Person exist as `entities` rows (see
+  KNOWLEDGE_MODEL.md's Core Entities), an edge needs to reference either a
+  Document or an Entity. Polymorphic column vs. a union table is open.

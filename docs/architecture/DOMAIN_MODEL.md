@@ -11,7 +11,10 @@ last_reviewed: 2026-08-01
 > Companion to [RFC-0001](../../rfcs/0001-engineering-memory-kernel.md). This
 > is the business-level model — what Engineering Memory is *about* — not a
 > database schema. Storage-level shape (columns, types) is
-> [`DATABASE.md`](DATABASE.md).
+> [`DATABASE.md`](DATABASE.md). This is the **v1-scoped** slice of the full
+> shape in [`KNOWLEDGE_MODEL.md`](KNOWLEDGE_MODEL.md) — read that first for
+> how ADR/Rule/Decision/Component/Service map onto the general Document/Entity
+> distinction; this file stays the concrete, implementation-facing list.
 
 ## Entities
 
