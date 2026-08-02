@@ -1,0 +1,286 @@
+package indexer
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	mdchunker "github.com/truelogics/ai-memory/internal/chunker"
+	fscollector "github.com/truelogics/ai-memory/internal/collector/filesystem"
+	"github.com/truelogics/ai-memory/internal/domain"
+	"github.com/truelogics/ai-memory/internal/kernel"
+	mdnormalizer "github.com/truelogics/ai-memory/internal/normalizer"
+	mdparser "github.com/truelogics/ai-memory/internal/parser/markdown"
+	"github.com/truelogics/ai-memory/internal/storage/sqlite"
+)
+
+// --- stubs for isolated control-flow tests ---
+
+type stubCollector struct {
+	docs []domain.RawDocument
+	err  error
+}
+
+func (c *stubCollector) Collect(ctx context.Context, repo domain.Repository) ([]domain.RawDocument, error) {
+	return c.docs, c.err
+}
+
+type stubParser struct {
+	fail map[string]bool // paths that should fail to parse
+}
+
+func (p *stubParser) CanParse(raw domain.RawDocument) bool { return true }
+
+func (p *stubParser) Parse(ctx context.Context, raw domain.RawDocument) (domain.CanonicalDocument, error) {
+	if p.fail[raw.Path] {
+		return domain.CanonicalDocument{}, fmt.Errorf("stub parser: forced failure for %s", raw.Path)
+	}
+	doc, err := domain.NewCanonicalDocument(raw.SourceID, raw.SourceID, raw.Path)
+	if err != nil {
+		return domain.CanonicalDocument{}, err
+	}
+	doc.Content = string(raw.Bytes)
+	doc.ContentHash = string(raw.Bytes) // deterministic stand-in for a real hash, keyed to content
+	return doc, nil
+}
+
+type refusingParser struct{}
+
+func (refusingParser) CanParse(raw domain.RawDocument) bool { return false }
+func (refusingParser) Parse(context.Context, domain.RawDocument) (domain.CanonicalDocument, error) {
+	return domain.CanonicalDocument{}, errors.New("should never be called")
+}
+
+func openTestStore(t *testing.T) kernel.Storage {
+	t.Helper()
+	store, err := sqlite.Open("file:" + t.Name() + "?mode=memory&cache=private")
+	if err != nil {
+		t.Fatalf("sqlite.Open: %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+	return store
+}
+
+func testRepo(t *testing.T, storage kernel.Storage) domain.Repository {
+	t.Helper()
+	repo, err := domain.NewRepository("ws-1", "test-repo", "/repos/test-repo")
+	if err != nil {
+		t.Fatalf("NewRepository: %v", err)
+	}
+	if err := storage.PutRepository(context.Background(), repo); err != nil {
+		t.Fatalf("PutRepository: %v", err)
+	}
+	return repo
+}
+
+func TestIndexAddsNewDocuments(t *testing.T) {
+	ctx := context.Background()
+	storage := openTestStore(t)
+	repo := testRepo(t, storage)
+
+	collector := &stubCollector{docs: []domain.RawDocument{
+		{SourceID: repo.ID, Path: "a.md", Bytes: []byte("content a")},
+		{SourceID: repo.ID, Path: "b.md", Bytes: []byte("content b")},
+	}}
+	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+
+	result, err := idx.Index(ctx, repo)
+	if err != nil {
+		t.Fatalf("Index: unexpected error: %v", err)
+	}
+	if result.Scanned != 2 || result.Added != 2 || result.Updated != 0 || result.Unchanged != 0 || result.Errors != 0 {
+		t.Fatalf("Index result = %+v, want Scanned=2 Added=2", result)
+	}
+
+	docs, err := storage.ListDocuments(ctx, repo.ID)
+	if err != nil {
+		t.Fatalf("ListDocuments: %v", err)
+	}
+	if len(docs) != 2 {
+		t.Fatalf("ListDocuments after Index = %d docs, want 2", len(docs))
+	}
+}
+
+func TestIndexSkipsUnchangedOnSecondRun(t *testing.T) {
+	ctx := context.Background()
+	storage := openTestStore(t)
+	repo := testRepo(t, storage)
+
+	collector := &stubCollector{docs: []domain.RawDocument{
+		{SourceID: repo.ID, Path: "a.md", Bytes: []byte("stable content")},
+	}}
+	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+
+	if _, err := idx.Index(ctx, repo); err != nil {
+		t.Fatalf("Index (first run): %v", err)
+	}
+	result, err := idx.Index(ctx, repo)
+	if err != nil {
+		t.Fatalf("Index (second run): %v", err)
+	}
+	if result.Unchanged != 1 || result.Added != 0 || result.Updated != 0 {
+		t.Fatalf("second Index result = %+v, want Unchanged=1", result)
+	}
+}
+
+func TestIndexReportsUpdatedWhenContentChanges(t *testing.T) {
+	ctx := context.Background()
+	storage := openTestStore(t)
+	repo := testRepo(t, storage)
+
+	collector := &stubCollector{docs: []domain.RawDocument{
+		{SourceID: repo.ID, Path: "a.md", Bytes: []byte("version one")},
+	}}
+	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+	if _, err := idx.Index(ctx, repo); err != nil {
+		t.Fatalf("Index (first run): %v", err)
+	}
+
+	collector.docs[0].Bytes = []byte("version two, changed")
+	result, err := idx.Index(ctx, repo)
+	if err != nil {
+		t.Fatalf("Index (second run): %v", err)
+	}
+	if result.Updated != 1 || result.Added != 0 || result.Unchanged != 0 {
+		t.Fatalf("Index result after content change = %+v, want Updated=1", result)
+	}
+}
+
+func TestIndexCountsErrorsAndContinuesProcessingOtherFiles(t *testing.T) {
+	ctx := context.Background()
+	storage := openTestStore(t)
+	repo := testRepo(t, storage)
+
+	collector := &stubCollector{docs: []domain.RawDocument{
+		{SourceID: repo.ID, Path: "good.md", Bytes: []byte("fine")},
+		{SourceID: repo.ID, Path: "bad.md", Bytes: []byte("boom")},
+	}}
+	parser := &stubParser{fail: map[string]bool{"bad.md": true}}
+	idx := New(collector, []kernel.Parser{parser}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+
+	result, err := idx.Index(ctx, repo)
+	if err != nil {
+		t.Fatalf("Index: unexpected top-level error (should count per-file errors instead): %v", err)
+	}
+	if result.Errors != 1 || result.Added != 1 {
+		t.Fatalf("Index result = %+v, want Errors=1 Added=1", result)
+	}
+}
+
+func TestIndexNoParserMatchCountsAsError(t *testing.T) {
+	ctx := context.Background()
+	storage := openTestStore(t)
+	repo := testRepo(t, storage)
+
+	collector := &stubCollector{docs: []domain.RawDocument{
+		{SourceID: repo.ID, Path: "unknown.xyz", Bytes: []byte("???")},
+	}}
+	idx := New(collector, []kernel.Parser{refusingParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+
+	result, err := idx.Index(ctx, repo)
+	if err != nil {
+		t.Fatalf("Index: unexpected error: %v", err)
+	}
+	if result.Errors != 1 {
+		t.Fatalf("Index result = %+v, want Errors=1 (no parser matched)", result)
+	}
+}
+
+func TestIndexPropagatesCollectorError(t *testing.T) {
+	ctx := context.Background()
+	storage := openTestStore(t)
+	repo := testRepo(t, storage)
+
+	collector := &stubCollector{err: errors.New("disk on fire")}
+	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+
+	if _, err := idx.Index(ctx, repo); err == nil {
+		t.Fatal("Index: expected error when Collector fails")
+	}
+}
+
+func TestIndexWritesIndexState(t *testing.T) {
+	ctx := context.Background()
+	storage := openTestStore(t)
+	repo := testRepo(t, storage)
+
+	collector := &stubCollector{docs: []domain.RawDocument{
+		{SourceID: repo.ID, Path: "a.md", Bytes: []byte("content")},
+	}}
+	fixedNow := time.Date(2026, 8, 2, 9, 0, 0, 0, time.UTC)
+	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+	idx.Now = func() time.Time { return fixedNow }
+
+	if _, err := idx.Index(ctx, repo); err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+
+	state, ok, err := storage.GetIndexState(ctx, repo.ID)
+	if err != nil {
+		t.Fatalf("GetIndexState: %v", err)
+	}
+	if !ok {
+		t.Fatal("GetIndexState: expected index state to exist after Index")
+	}
+	if state.DocumentCount != 1 || state.Status != kernel.IndexStatusClean || !state.LastFullIndexAt.Equal(fixedNow) {
+		t.Fatalf("GetIndexState = %+v, want DocumentCount=1 Status=clean LastFullIndexAt=%v", state, fixedNow)
+	}
+}
+
+// --- end-to-end: real Collector + real Parser + real Normalizer + real
+// Chunker + real sqlite Storage, on files written to a temp directory ---
+
+func TestIndexEndToEndWithRealComponents(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	writeFile(t, dir, "README.md", "---\ndoc: README\nstatus: living\n---\n\n# Demo Repo\n\nWe chose JWT for stateless authentication.\n")
+	writeFile(t, dir, "ARCHITECTURE.md", "# Architecture\n\nThe pipeline has several stages.\n")
+
+	storage := openTestStore(t)
+	repo, err := domain.NewRepository("ws-1", "demo-repo", dir)
+	if err != nil {
+		t.Fatalf("NewRepository: %v", err)
+	}
+	if err := storage.PutRepository(ctx, repo); err != nil {
+		t.Fatalf("PutRepository: %v", err)
+	}
+
+	idx := New(
+		fscollector.New(),
+		[]kernel.Parser{mdparser.New()},
+		mdnormalizer.New(),
+		mdchunker.New(mdchunker.StrategyHeading),
+		storage,
+	)
+
+	result, err := idx.Index(ctx, repo)
+	if err != nil {
+		t.Fatalf("Index: unexpected error: %v", err)
+	}
+	if result.Scanned != 2 || result.Added != 2 || result.Errors != 0 {
+		t.Fatalf("Index result = %+v, want Scanned=2 Added=2 Errors=0", result)
+	}
+
+	matches, err := storage.SearchChunks(ctx, "authentication", kernel.SearchOptions{})
+	if err != nil {
+		t.Fatalf("SearchChunks: %v", err)
+	}
+	if len(matches) != 1 || matches[0].Document.Path != "README.md" {
+		t.Fatalf("SearchChunks(authentication) = %+v, want 1 hit on README.md", matches)
+	}
+}
+
+func writeFile(t *testing.T, dir, rel, content string) {
+	t.Helper()
+	full := filepath.Join(dir, rel)
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+}
