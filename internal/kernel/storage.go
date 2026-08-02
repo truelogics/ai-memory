@@ -79,6 +79,12 @@ type Storage interface {
 	// Relationships
 	PutRelationship(ctx context.Context, rel domain.Relationship) error
 	ListRelationships(ctx context.Context, documentID string) ([]domain.Relationship, error)
+	// TraverseRelationships returns document ids reachable from
+	// documentID within depth hops — a bounded `WITH RECURSIVE` query,
+	// not a second graph-storage engine (RFC-0003/GRAPH.md). Excludes
+	// documentID itself. internal/graph.Graph wraps this with edge
+	// hydration.
+	TraverseRelationships(ctx context.Context, documentID string, depth int) ([]string, error)
 
 	// Index state
 	GetIndexState(ctx context.Context, repositoryID string) (IndexState, bool, error)
