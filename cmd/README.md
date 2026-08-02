@@ -1,13 +1,15 @@
 ---
 doc: cmd
 audience: [human, agent]
-status: reserved
+status: bootstrapped
 owner: ai-memory
-last_reviewed: 2026-07-30
+last_reviewed: 2026-08-02
 ---
 
 # cmd/
 
-CLI entrypoints for AI Memory (e.g. `ai-memory ingest`, `ai-memory query`).
+CLI entrypoints for AI Memory.
 
-> **Reserved for implementation** — no code yet.
+> **Bootstrapped, not implemented** — `cmd/eng` builds and runs `eng version`
+> only. The other six commands in [`../CLI.md`](../CLI.md) are designed but
+> not coded; that's Sprint 2.
