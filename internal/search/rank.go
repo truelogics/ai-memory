@@ -10,19 +10,41 @@ import (
 
 var errEmbeddingCountMismatch = errors.New("search: embedding provider returned a different number of vectors than texts submitted")
 
-// Blend weights. Fixed, not configurable — Step 8's own sequencing defers
-// configurable ranking to Milestone 7 ("later this can become
-// configurable"). Keyword relevance stays the dominant signal; graph and
-// embedding are refinements, not replacements, per RFC-0003/GRAPH.md's
+// Default blend weights — used whenever Search.Weights is the zero
+// value. Keyword relevance stays the dominant signal by default; graph
+// and embedding are refinements, not replacements, per RFC-0003/GRAPH.md's
 // framing of hybrid search as making existing results "more accurate,"
-// not a second ranking system.
+// not a second ranking system. Milestone 7 makes these configurable
+// rather than fixed — set Search.Weights to override.
 const (
-	weightKeywordOnly           = 0.80
-	weightGraphOnly             = 0.20
-	weightKeywordWithEmbeddings = 0.70
-	weightGraphWithEmbeddings   = 0.20
-	weightEmbeddings            = 0.10
+	defaultWeightKeywordOnly           = 0.80
+	defaultWeightGraphOnly             = 0.20
+	defaultWeightKeywordWithEmbeddings = 0.70
+	defaultWeightGraphWithEmbeddings   = 0.20
+	defaultWeightEmbeddings            = 0.10
 )
+
+// RankWeights configures how keyword/graph/embedding signals blend into
+// one score (Milestone 7). The zero value means "use Milestone 5's
+// defaults" — callers that don't care about tuning ranking never need to
+// touch this.
+type RankWeights struct {
+	Keyword   float64
+	Graph     float64
+	Embedding float64
+}
+
+// isZero reports whether w is the zero value — the "use defaults" signal.
+func (w RankWeights) isZero() bool {
+	return w == RankWeights{}
+}
+
+func defaultWeights(hasEmbeddings bool) RankWeights {
+	if hasEmbeddings {
+		return RankWeights{Keyword: defaultWeightKeywordWithEmbeddings, Graph: defaultWeightGraphWithEmbeddings, Embedding: defaultWeightEmbeddings}
+	}
+	return RankWeights{Keyword: defaultWeightKeywordOnly, Graph: defaultWeightGraphOnly}
+}
 
 // scoredMatch pairs a raw ChunkMatch with its blended hybrid score.
 type scoredMatch struct {
@@ -32,15 +54,20 @@ type scoredMatch struct {
 
 // rank blends keyword (BM25, from Storage), graph (connectivity within
 // this result set), and — if s.Embeddings is configured — semantic
-// similarity into one score per match. Graph and embedding signals are
-// both optional in the sense that a zero-value component (no
-// relationships in this pool; no EmbeddingProvider configured) degrades
-// to keyword-only ranking, not an error.
+// similarity into one score per match, using s.Weights (or Milestone 5's
+// defaults if unset). Graph and embedding signals are both optional in
+// the sense that a zero-value component (no relationships in this pool;
+// no EmbeddingProvider configured) degrades to keyword-only ranking, not
+// an error.
 func (s *Search) rank(ctx context.Context, query string, matches []kernel.ChunkMatch) ([]scoredMatch, error) {
 	keyword := normalize(extractScores(matches))
 	graphBoost := s.graphBoosts(ctx, matches)
 
-	keywordWeight, graphWeight := weightKeywordOnly, weightGraphOnly
+	weights := s.Weights
+	if weights.isZero() {
+		weights = defaultWeights(s.Embeddings != nil)
+	}
+
 	var embedBoost []float64
 	if s.Embeddings != nil {
 		var err error
@@ -48,14 +75,13 @@ func (s *Search) rank(ctx context.Context, query string, matches []kernel.ChunkM
 		if err != nil {
 			return nil, err
 		}
-		keywordWeight, graphWeight = weightKeywordWithEmbeddings, weightGraphWithEmbeddings
 	}
 
 	out := make([]scoredMatch, len(matches))
 	for i, m := range matches {
-		blended := keywordWeight*keyword[i] + graphWeight*graphBoost[i]
+		blended := weights.Keyword*keyword[i] + weights.Graph*graphBoost[i]
 		if embedBoost != nil {
-			blended += weightEmbeddings * embedBoost[i]
+			blended += weights.Embedding * embedBoost[i]
 		}
 		out[i] = scoredMatch{match: m, blended: blended}
 	}

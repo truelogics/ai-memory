@@ -14,26 +14,29 @@ import (
 	"github.com/truelogics/ai-memory/internal/kernel"
 )
 
-// groupOrder fixes the section order every RetrievalBundle uses,
-// regardless of which types actually have hits — so "Related Issues" and
-// "Related PRs" show up (empty) even though nothing ingests those yet,
-// matching CLI.md's existing `eng ask` convention of showing what's
-// *not* covered, not just omitting it silently.
-var groupOrder = []struct {
-	label   string
-	docType domain.DocType
-}{
-	{"Architecture", domain.DocTypeStandard},
-	{"Related ADRs", domain.DocTypeADR},
-	{"Rules", domain.DocTypeRule},
-	{"Related RFCs", domain.DocTypeRFC},
-	{"Roadmap", domain.DocTypeRoadmap},
-	{"Documentation", domain.DocTypeReadme},
+// labelByDocType maps a Knowledge Type to the section label its
+// documents get grouped under.
+var labelByDocType = map[domain.DocType]string{
+	domain.DocTypeStandard: "Architecture",
+	domain.DocTypeADR:      "Related ADRs",
+	domain.DocTypeRule:     "Rules",
+	domain.DocTypeRFC:      "Related RFCs",
+	domain.DocTypeRoadmap:  "Roadmap",
+	domain.DocTypeReadme:   "Documentation",
 }
 
 // alwaysShownEmpty are sections with no producer yet (RFC-0001's
 // non-goals: no PR/Issue ingestion) — shown empty rather than omitted.
 var alwaysShownEmpty = []string{"Related Issues", "Related PRs"}
+
+// defaultPriority is the section order used when Retriever.Priority is
+// unset — matches Step 8's own "Priority example" (Architecture, ADRs,
+// ..., README) as closely as this kernel's actual Knowledge Types allow.
+// Milestone 7: this used to be the only order; now it's just the default.
+var defaultPriority = []string{
+	"Architecture", "Related ADRs", "Rules", "Related RFCs", "Roadmap",
+	"Documentation", "Related Issues", "Related PRs",
+}
 
 // stopwords are dropped when turning a free-text task ("Review the
 // authentication PR") into a search query — plain keyword search, not
@@ -48,11 +51,17 @@ var stopwords = map[string]bool{
 // Retriever implements kernel.Retriever against a kernel.Search.
 type Retriever struct {
 	Search kernel.Search
+	// Priority orders the returned groups (Milestone 7). Zero value uses
+	// defaultPriority. A custom Priority only needs to name the sections
+	// worth moving to the front — anything from defaultPriority it
+	// doesn't mention still appears afterward; nothing is silently
+	// dropped by a partial list.
+	Priority []string
 }
 
 var _ kernel.Retriever = (*Retriever)(nil)
 
-// New returns a Retriever backed by search.
+// New returns a Retriever backed by search, using defaultPriority.
 func New(search kernel.Search) *Retriever {
 	return &Retriever{Search: search}
 }
@@ -64,26 +73,42 @@ func (r *Retriever) Retrieve(ctx context.Context, task string) (kernel.Retrieval
 		return kernel.RetrievalBundle{}, fmt.Errorf("retriever: %w", err)
 	}
 
-	byType := make(map[domain.DocType][]kernel.SearchResult, len(groupOrder))
-	other := []kernel.SearchResult{}
-	known := make(map[domain.DocType]bool, len(groupOrder))
-	for _, g := range groupOrder {
-		known[g.docType] = true
-	}
+	byLabel := make(map[string][]kernel.SearchResult, len(labelByDocType)+len(alwaysShownEmpty))
+	var other []kernel.SearchResult
 	for _, res := range results {
-		if known[res.Document.Type] {
-			byType[res.Document.Type] = append(byType[res.Document.Type], res)
+		if label, ok := labelByDocType[res.Document.Type]; ok {
+			byLabel[label] = append(byLabel[label], res)
 			continue
 		}
 		other = append(other, res)
 	}
-
-	groups := make([]kernel.RetrievalGroup, 0, len(groupOrder)+len(alwaysShownEmpty)+1)
-	for _, g := range groupOrder {
-		groups = append(groups, kernel.RetrievalGroup{Label: g.label, Results: byType[g.docType]})
-	}
 	for _, label := range alwaysShownEmpty {
-		groups = append(groups, kernel.RetrievalGroup{Label: label})
+		if _, ok := byLabel[label]; !ok {
+			byLabel[label] = nil
+		}
+	}
+
+	order := r.Priority
+	if len(order) == 0 {
+		order = defaultPriority
+	}
+
+	emitted := make(map[string]bool, len(byLabel))
+	groups := make([]kernel.RetrievalGroup, 0, len(byLabel)+1)
+	emit := func(label string) {
+		if emitted[label] {
+			return
+		}
+		emitted[label] = true
+		groups = append(groups, kernel.RetrievalGroup{Label: label, Results: byLabel[label]})
+	}
+	for _, label := range order {
+		emit(label)
+	}
+	// A partial custom Priority reorders what it names; anything from
+	// the default set it left out still appears, just afterward.
+	for _, label := range defaultPriority {
+		emit(label)
 	}
 	if len(other) > 0 {
 		groups = append(groups, kernel.RetrievalGroup{Label: "Other", Results: other})

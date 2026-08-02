@@ -192,3 +192,72 @@ func TestRankKeywordOnlyWhenNoGraphOrEmbeddings(t *testing.T) {
 		t.Fatalf("rank = %+v, want higher raw Score to stay ranked first with no graph/embedding signal", scored)
 	}
 }
+
+func TestRankCustomWeightsOverrideOrdering(t *testing.T) {
+	ctx := context.Background()
+	storage := openTestStore(t)
+	repo, _ := domain.NewRepository("ws-1", "ai-memory", "/repos/ai-memory")
+	_ = storage.PutRepository(ctx, repo)
+
+	weak := putDoc(t, ctx, storage, repo.ID, "weak.md", "content")     // lower keyword score, connected
+	strong := putDoc(t, ctx, storage, repo.ID, "strong.md", "content") // higher keyword score, isolated
+	partner := putDoc(t, ctx, storage, repo.ID, "partner.md", "content")
+
+	rel, err := domain.NewRelationship(weak.ID, partner.ID, domain.RelationshipReferences, domain.RelationshipExplicit)
+	if err != nil {
+		t.Fatalf("NewRelationship: %v", err)
+	}
+	weak.Relationships = []domain.Relationship{rel}
+	if err := storage.PutDocument(ctx, weak); err != nil {
+		t.Fatalf("PutDocument: %v", err)
+	}
+
+	matches := []kernel.ChunkMatch{
+		{Document: strong, Score: 1.0},
+		{Document: weak, Score: 0.1},
+		{Document: partner, Score: 0.05},
+	}
+
+	s := &Search{Storage: storage, Graph: graph.New(storage)}
+
+	// rank() doesn't sort — Search() does that afterward — so find the
+	// highest-blended entry explicitly rather than assuming index 0.
+	top := func(scored []scoredMatch) string {
+		best := scored[0]
+		for _, sc := range scored[1:] {
+			if sc.blended > best.blended {
+				best = sc
+			}
+		}
+		return best.match.Document.ID
+	}
+
+	// Default weights (keyword-dominant): the low-keyword-score "weak"
+	// doc must not outrank "strong" despite its graph connection.
+	defaultScored, err := s.rank(ctx, "query", matches)
+	if err != nil {
+		t.Fatalf("rank (default weights): %v", err)
+	}
+	if got := top(defaultScored); got != strong.ID {
+		t.Fatalf("rank (default weights) top result = %s, want %s (keyword-dominant default)", got, strong.ID)
+	}
+
+	// Custom weights (graph-dominant): now "weak" should outrank "strong".
+	s.Weights = RankWeights{Keyword: 0.1, Graph: 0.9}
+	customScored, err := s.rank(ctx, "query", matches)
+	if err != nil {
+		t.Fatalf("rank (custom weights): %v", err)
+	}
+	if got := top(customScored); got != weak.ID {
+		t.Fatalf("rank (custom graph-dominant weights) top result = %s, want %s — custom Weights should change the outcome, not just internal scores", got, weak.ID)
+	}
+}
+
+func TestRankWeightsIsZero(t *testing.T) {
+	if !(RankWeights{}).isZero() {
+		t.Fatal("RankWeights{}.isZero() = false, want true")
+	}
+	if (RankWeights{Keyword: 0.5}).isZero() {
+		t.Fatal("RankWeights{Keyword: 0.5}.isZero() = true, want false")
+	}
+}

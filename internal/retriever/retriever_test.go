@@ -122,3 +122,60 @@ func TestKeywordsFallsBackToRawTaskWhenAllStopwords(t *testing.T) {
 		t.Fatalf("keywords(all stopwords) = %q, want the original task unchanged", got)
 	}
 }
+
+func TestRetrieveDefaultPriorityOrder(t *testing.T) {
+	ctx := context.Background()
+	storage := openTestStore(t)
+	repo, _ := domain.NewRepository("ws-1", "ai-memory", "/repos/ai-memory")
+	_ = storage.PutRepository(ctx, repo)
+	putDoc(t, ctx, storage, repo.ID, "adr.md", "authentication", domain.DocTypeADR)
+	putDoc(t, ctx, storage, repo.ID, "arch.md", "authentication", domain.DocTypeStandard)
+
+	r := New(search.New(storage))
+	bundle, err := r.Retrieve(ctx, "authentication")
+	if err != nil {
+		t.Fatalf("Retrieve: %v", err)
+	}
+	if len(bundle.Groups) < 2 || bundle.Groups[0].Label != "Architecture" || bundle.Groups[1].Label != "Related ADRs" {
+		labels := make([]string, len(bundle.Groups))
+		for i, g := range bundle.Groups {
+			labels[i] = g.Label
+		}
+		t.Fatalf("group order = %v, want Architecture before Related ADRs (default priority)", labels)
+	}
+}
+
+func TestRetrieveCustomPriorityReordersGroups(t *testing.T) {
+	ctx := context.Background()
+	storage := openTestStore(t)
+	repo, _ := domain.NewRepository("ws-1", "ai-memory", "/repos/ai-memory")
+	_ = storage.PutRepository(ctx, repo)
+	putDoc(t, ctx, storage, repo.ID, "adr.md", "authentication", domain.DocTypeADR)
+	putDoc(t, ctx, storage, repo.ID, "arch.md", "authentication", domain.DocTypeStandard)
+	putDoc(t, ctx, storage, repo.ID, "rule.md", "authentication", domain.DocTypeRule)
+
+	r := &Retriever{Search: search.New(storage), Priority: []string{"Rules", "Related ADRs"}}
+	bundle, err := r.Retrieve(ctx, "authentication")
+	if err != nil {
+		t.Fatalf("Retrieve: %v", err)
+	}
+
+	var labels []string
+	for _, g := range bundle.Groups {
+		labels = append(labels, g.Label)
+	}
+	if len(labels) < 2 || labels[0] != "Rules" || labels[1] != "Related ADRs" {
+		t.Fatalf("group order = %v, want custom Priority [Rules, Related ADRs] to come first", labels)
+	}
+	// Architecture wasn't in the custom Priority — it must still appear
+	// (afterward), not be silently dropped.
+	found := false
+	for _, l := range labels {
+		if l == "Architecture" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("group order = %v, want Architecture still present even though the custom Priority didn't mention it", labels)
+	}
+}

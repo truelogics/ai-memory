@@ -54,6 +54,10 @@ type Search struct {
 	// entirely (Milestone 4 shipped no provider, so this is nil in every
 	// real deployment today) — see rank.go's embeddingBoosts.
 	Embeddings kernel.EmbeddingProvider
+	// Weights overrides the keyword/graph/embedding blend (Milestone 7).
+	// Zero value uses Milestone 5's defaults — see rank.go's
+	// defaultWeights.
+	Weights RankWeights
 }
 
 var _ kernel.Search = (*Search)(nil)

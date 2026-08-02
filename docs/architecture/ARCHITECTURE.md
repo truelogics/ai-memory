@@ -142,11 +142,13 @@ search"): keyword (BM25, normalized), graph (a candidate connected to
 other candidates in the *same* result set is boosted — sparse today,
 since explicit Relationships are still rare), and, only if an
 `EmbeddingProvider` is configured (none is, in any real deployment yet —
-Milestone 4 shipped no provider), semantic similarity. Fixed blend
-weights, not configurable — Milestone 7 is where that's meant to happen.
-Returns a ranked list: file, blended score, matched snippet, related
-files. "Related" tries explicit Relationships first, then falls back to
-documents sharing a non-structural Tag. This is what `eng search` calls
+Milestone 4 shipped no provider), semantic similarity. Blend weights
+default to Milestone 5's values but are configurable via `Search.Weights`
+(Milestone 7), and `Retriever`'s section order is configurable the same
+way via `Retriever.Priority`. Returns a ranked list: file, blended score,
+matched snippet, related files. "Related" tries explicit Relationships
+first, then falls back to documents sharing a non-structural Tag. This is
+what `eng search` calls
 directly.
 
 ### Retriever (`internal/retriever`)
