@@ -21,6 +21,6 @@ integration guides.
 
 | Doc | Purpose | Status |
 |-----|---------|--------|
-| [data-model.md](data-model.md) | Storage schema draft (see `DATABASE.md`, pending) | draft |
+| [data-model.md](data-model.md) | Storage schema — early draft | superseded by [`../DATABASE.md`](../DATABASE.md) |
 | _api.md_ | Query and ingest interfaces | planned |
 | _ingestion.md_ | How sources are parsed and indexed | planned |

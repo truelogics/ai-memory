@@ -8,9 +8,11 @@ last_reviewed: 2026-07-30
 
 # Data model
 
-Core entities AI Memory stores and how they relate. To be finalized in RFC-0001.
+Core entities AI Memory stores and how they relate.
 
-> **Status:** draft — placeholders only, no implementation.
+> **Status:** superseded by [`../DATABASE.md`](../DATABASE.md), the finalized
+> v1 schema per [RFC-0001](../RFC/0001-engineering-memory-kernel.md). Kept
+> here for history; new schema work happens in `DATABASE.md`.
 
 ## Entities (draft)
 
