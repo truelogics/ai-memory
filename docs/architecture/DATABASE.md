@@ -9,9 +9,9 @@ last_reviewed: 2026-08-02
 # Database
 
 > Storage-level shape for [DOMAIN_MODEL.md](DOMAIN_MODEL.md), scoped to what
-> [RFC-0001](RFC/0001-engineering-memory-kernel.md) puts in v1. SQLite, one
-> file per Workspace. This defines columns and relationships, not SQL DDL —
-> that comes with the Storage implementation in Sprint 2.
+> [RFC-0001](../../rfcs/0001-engineering-memory-kernel.md) puts in v1. SQLite,
+> one file per Workspace. This defines columns and relationships, not SQL
+> DDL — that comes with the Storage implementation in Sprint 2.
 
 ## Tables
 
@@ -68,8 +68,8 @@ so it isn't listed separately here.
 
 Freeform key/value pairs extracted from a Document's front-matter or inline
 metadata — e.g. `severity=error`, `adr_number=0007`, `applies_to=apps/**`.
-Generalizes Rule and ADR-specific fields (see `docs/data-model.md`'s draft
-`Rule`/`Decision` field lists) into one table instead of one column set per
+Generalizes Rule and ADR-specific fields (see [`data-model.md`](data-model.md)'s
+draft `Rule`/`Decision` field lists) into one table instead of one column set per
 doc type, so Milestone 2's Component/Service tagging reuses this rather than
 needing new tables.
 

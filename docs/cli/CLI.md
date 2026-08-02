@@ -8,15 +8,17 @@ last_reviewed: 2026-08-02
 
 # CLI
 
-> Companion to [RFC-0001](RFC/0001-engineering-memory-kernel.md),
-> [ARCHITECTURE.md](ARCHITECTURE.md), and [DATABASE.md](DATABASE.md).
+> Companion to [RFC-0001](../../rfcs/0001-engineering-memory-kernel.md),
+> [ARCHITECTURE.md](../architecture/ARCHITECTURE.md), and
+> [DATABASE.md](../architecture/DATABASE.md).
 
 ## Note on scope: 5 commands vs. 7
 
-RFC-0001's CLI section lists five commands (`init`, `index`, `search`, `ask`,
-`status`). This document works from the Week 1 plan's seven, which add `add`
-and `doctor`. That's a real discrepancy, not a stylistic one — flagging it
-here rather than quietly picking a side:
+RFC-0001's CLI section originally listed five commands (`init`, `index`,
+`search`, `ask`, `status`). The Week 1 plan's CLI task specified seven,
+adding `add` and `doctor`. That was a real discrepancy, not a stylistic one —
+RFC-0001 has since been patched to match this document's seven. Keeping the
+reasoning here since it's still the source of truth for *why*:
 
 - **`add`** earns its place: without it, a multi-repo Workspace (the whole
   point of indexing `ai-memory` + `engineering` + `roadmap` + `vision`
@@ -31,8 +33,7 @@ here rather than quietly picking a side:
   whose `local_path` no longer exists). Different failure class, matches the
   `git fsck` / `brew doctor` convention.
 
-Net: this reconciles to **7 commands**. RFC-0001's CLI section should be
-patched to match — flagged as a follow-up, not done silently in that file.
+Net: this reconciles to **7 commands**, matching RFC-0001.
 
 ## Commands
 
@@ -76,8 +77,8 @@ Workspace now spans 2 repositories. Run `eng index` to index it.
 
 **Purpose:** Walk every registered repository, parse markdown files, and
 populate `documents` / `document_chunks` / `tags` / `relationships` (see
-DATABASE.md). Skips files whose `content_hash` hasn't changed since the
-last run.
+[`../architecture/DATABASE.md`](../architecture/DATABASE.md)). Skips files
+whose `content_hash` hasn't changed since the last run.
 
 **Arguments:**
 - `--repo <name>` — index only one registered repository
@@ -114,7 +115,7 @@ Workspace.
 $ eng search "authentication"
 1. engineering/ADR/0003-jwt-auth.md          score 0.91
    "...we chose JWT for stateless auth because..."
-   related: engineering/ARCHITECTURE.md, ai-memory/RFC/0001-*.md
+   related: engineering/ARCHITECTURE.md, ai-memory/rfcs/0001-*.md
 
 2. README.md                                  score 0.42
    "...authentication is handled by..."
@@ -124,7 +125,7 @@ $ eng search "authentication"
 
 **Purpose:** Retriever bundle for a natural-language question — groups
 `eng search` results into labeled sections. No LLM, no generated prose (see
-ARCHITECTURE.md's Retriever).
+[`../architecture/ARCHITECTURE.md`](../architecture/ARCHITECTURE.md)'s Retriever).
 
 **Arguments:** `question` (required, positional)
 

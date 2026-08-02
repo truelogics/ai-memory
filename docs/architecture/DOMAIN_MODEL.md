@@ -8,11 +8,10 @@ last_reviewed: 2026-08-01
 
 # Domain model
 
-> Companion to [RFC-0001](RFC/0001-engineering-memory-kernel.md). This is the
-> business-level model — what Engineering Memory is *about* — not a database
-> schema. Storage-level shape (columns, types) is
-> [`docs/data-model.md`](docs/data-model.md), being finalized alongside
-> `DATABASE.md` this week.
+> Companion to [RFC-0001](../../rfcs/0001-engineering-memory-kernel.md). This
+> is the business-level model — what Engineering Memory is *about* — not a
+> database schema. Storage-level shape (columns, types) is
+> [`DATABASE.md`](DATABASE.md).
 
 ## Entities
 

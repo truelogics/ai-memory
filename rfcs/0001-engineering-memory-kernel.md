@@ -70,7 +70,7 @@ Every one of these is real future work. None of it is this RFC.
 
 ### Domain model
 
-Full definitions live in [`DOMAIN_MODEL.md`](../DOMAIN_MODEL.md). Summary of
+Full definitions live in [`DOMAIN_MODEL.md`](../docs/architecture/DOMAIN_MODEL.md). Summary of
 entities and which ship in v1:
 
 | Entity | v1 (MVP) | Later |
@@ -89,7 +89,7 @@ entities and which ship in v1:
 
 ### Architecture
 
-Full component breakdown lives in [`ARCHITECTURE.md`](../ARCHITECTURE.md).
+Full component breakdown lives in [`ARCHITECTURE.md`](../docs/architecture/ARCHITECTURE.md).
 Shape of the pipeline:
 
 ```
@@ -103,7 +103,7 @@ runs locally against files already on disk.
 
 Seven commands for v0.1 (revised from an earlier five-command draft — `add`
 and `doctor` earn their place once a Workspace spans multiple repos; see
-[`CLI.md`](../CLI.md) for the full reconciliation):
+[`CLI.md`](../docs/cli/CLI.md) for the full reconciliation):
 
 ```
 eng init      # create a workspace + local SQLite index in the current repo
@@ -115,13 +115,13 @@ eng status    # index health: doc count, staleness, last index time
 eng doctor    # diagnose a broken index (orphaned rows, missing repo paths)
 ```
 
-Detailed usage, flags, and output shapes live in [`CLI.md`](../CLI.md) so
+Detailed usage, flags, and output shapes live in [`CLI.md`](../docs/cli/CLI.md) so
 this RFC stays about scope, not syntax.
 
 ### Storage
 
-SQLite, single file per workspace. Tables (names only — schema is
-`DATABASE.md`, Wednesday's deliverable):
+SQLite, single file per workspace. Tables (names only — full schema is
+[`DATABASE.md`](../docs/architecture/DATABASE.md)):
 
 ```
 repositories · documents · document_chunks · tags · relationships · index_state

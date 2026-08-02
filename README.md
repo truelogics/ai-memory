@@ -32,30 +32,30 @@ agents can load on demand.
 
 ## Current status
 
-**Planning** — documentation only. No implementation yet.
+**Design complete, implementation starting.** RFC-0001, architecture, domain
+model, database schema, and CLI design are done. Code so far: a Go module
+skeleton (`cmd/eng`) that runs `eng version` and nothing else — indexing,
+storage, and search are Sprint 2.
 
 ## Roadmap
 
-See [`ROADMAP.md`](ROADMAP.md). Summary:
-
-| Phase | Focus |
-|-------|--------|
-| 0 (now) | Docs, RFC-0001, data model |
-| 1 | MVP ingest + index + query |
-| 2 | Roadmap ingest, agent/MCP integration |
-| 3 | Multi-repo, embeddings, observability |
-
-Tracked company-wide in [`roadmap/NOW.md`](../roadmap/NOW.md).
+This repo has no roadmap file of its own — company-wide priority lives in
+[`roadmap/NOW.md`](../roadmap/NOW.md) and milestones in
+[`roadmap/MILESTONES.md`](../roadmap/MILESTONES.md), so there's exactly one
+place to check what's next, not two that can drift out of sync.
 
 ## Contributing
 
-1. Read [`VISION.md`](VISION.md), [`RFC-0001`](RFC/0001-engineering-memory-kernel.md),
-   [`ARCHITECTURE.md`](ARCHITECTURE.md), [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md),
-   [`DATABASE.md`](DATABASE.md), and [`CLI.md`](CLI.md)
-2. Significant design → open an RFC under `RFC/` (start from `0000-template.md`)
+1. Read [`RFC-0001`](rfcs/0001-engineering-memory-kernel.md),
+   [`ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md),
+   [`DOMAIN_MODEL.md`](docs/architecture/DOMAIN_MODEL.md),
+   [`DATABASE.md`](docs/architecture/DATABASE.md), and
+   [`CLI.md`](docs/cli/CLI.md)
+2. Significant design → open an RFC under `rfcs/` (start from `0000-template.md`)
 3. Org-wide decisions also land in [`engineering/ADR/`](../engineering/ADR/)
 
-Code dirs (`cmd/`, `internal/`, `pkg/`, `tests/`) are reserved — no code yet.
+Code dirs (`cmd/`, `internal/`, `pkg/`, `tests/`) are mostly reserved —
+`cmd/eng` has a skeleton, the rest have no code yet.
 
 ## Related repos
 
@@ -64,3 +64,25 @@ Code dirs (`cmd/`, `internal/`, `pkg/`, `tests/`) are reserved — no code yet.
 | [`engineering/`](../engineering/) | Source docs & rules consumed by memory |
 | [`roadmap/`](../roadmap/) | Company priorities |
 | [`vision/`](../vision/) | Company north star |
+
+## Map
+
+```
+ai-memory/
+├── README.md
+├── LICENSE
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── go.mod
+├── rfcs/               ← design proposals (0001: Engineering Memory Kernel)
+├── docs/
+│   ├── architecture/   ← ARCHITECTURE.md, DOMAIN_MODEL.md, DATABASE.md
+│   ├── cli/            ← CLI.md
+│   └── api/ storage/ search/ sdk/ plugins/ examples/   ← reserved
+├── cmd/eng/            ← CLI entrypoint (`eng version` only, so far)
+├── internal/           ← reserved — parser, indexer, storage, search
+├── pkg/                ← reserved — public libraries
+├── examples/           ← reserved — runnable usage examples
+├── scripts/            ← reserved — dev/build scripts
+└── tests/              ← reserved — integration/e2e tests
+```

@@ -1,26 +1,29 @@
 ---
 doc: docs-index
 audience: [human, agent]
-status: placeholder
+status: living
 owner: ai-memory
-last_reviewed: 2026-07-30
+last_reviewed: 2026-08-02
 ---
 
 # Docs
 
-Technical documentation for AI Memory — architecture, data model, APIs, and
-integration guides.
-
-> **Status:** RFC-0001 has landed. High-level architecture and domain model
-> now live at the repo root — [`../ARCHITECTURE.md`](../ARCHITECTURE.md) and
-> [`../DOMAIN_MODEL.md`](../DOMAIN_MODEL.md) — since they're read as often as
-> the README. This folder holds the storage-level and API-level detail that
-> sits underneath those.
+Technical documentation for AI Memory, one subfolder per concern. Design
+proposals live in [`../rfcs/`](../rfcs/), not here — this folder is where an
+accepted RFC's detail gets fleshed out and kept current.
 
 ## Index
 
-| Doc | Purpose | Status |
-|-----|---------|--------|
-| [data-model.md](data-model.md) | Storage schema — early draft | superseded by [`../DATABASE.md`](../DATABASE.md) |
-| _api.md_ | Query and ingest interfaces | planned |
-| _ingestion.md_ | How sources are parsed and indexed | planned |
+| Folder | Purpose | Status |
+|--------|---------|--------|
+| [architecture/](architecture/) | ARCHITECTURE.md, DOMAIN_MODEL.md, DATABASE.md — the v1 kernel design | living |
+| [cli/](cli/) | CLI.md — command reference | living |
+| [api/](api/) | Query/ingest interfaces for non-CLI consumers | reserved |
+| [storage/](storage/) | Storage engine internals, beyond the schema in `architecture/DATABASE.md` | reserved |
+| [search/](search/) | Ranking and retrieval internals, once past plain full-text (Milestone 2) | reserved |
+| [sdk/](sdk/) | Client library docs, once `pkg/` has one | reserved |
+| [plugins/](plugins/) | Extension points for new parsers/sources | reserved |
+| [examples/](examples/) | Doc-level usage walkthroughs (see also root [`../examples/`](../examples/) for runnable code) | reserved |
+
+"Reserved" folders hold a one-line README explaining what will eventually
+live there — no content yet, so there's nowhere to accidentally sprawl.

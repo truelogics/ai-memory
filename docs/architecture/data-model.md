@@ -10,8 +10,8 @@ last_reviewed: 2026-07-30
 
 Core entities AI Memory stores and how they relate.
 
-> **Status:** superseded by [`../DATABASE.md`](../DATABASE.md), the finalized
-> v1 schema per [RFC-0001](../RFC/0001-engineering-memory-kernel.md). Kept
+> **Status:** superseded by [`DATABASE.md`](DATABASE.md), the finalized v1
+> schema per [RFC-0001](../../rfcs/0001-engineering-memory-kernel.md). Kept
 > here for history; new schema work happens in `DATABASE.md`.
 
 ## Entities (draft)

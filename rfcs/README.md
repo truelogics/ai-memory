@@ -1,9 +1,9 @@
 ---
 doc: RFC-index
 audience: [human, agent]
-status: placeholder
+status: living
 owner: ai-memory
-last_reviewed: 2026-07-30
+last_reviewed: 2026-08-02
 ---
 
 # RFCs

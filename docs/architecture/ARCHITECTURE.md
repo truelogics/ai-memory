@@ -8,7 +8,7 @@ last_reviewed: 2026-08-01
 
 # Architecture
 
-> Companion to [RFC-0001](RFC/0001-engineering-memory-kernel.md). This
+> Companion to [RFC-0001](../../rfcs/0001-engineering-memory-kernel.md). This
 > describes the v1 kernel only — no AI, no embeddings, no agents.
 
 ## Pipeline
@@ -66,7 +66,7 @@ own output to answer a query.
 
 ### Storage (`internal/storage`)
 
-SQLite adapter. Owns the schema (`DATABASE.md`, pending) and all reads/writes.
+SQLite adapter. Owns the schema ([`DATABASE.md`](DATABASE.md)) and all reads/writes.
 Every other component talks to Storage through a narrow interface (e.g.
 `PutDocument`, `PutChunks`, `Query`) — no component reaches into SQLite
 directly except this one, so swapping the backing store later doesn't
