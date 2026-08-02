@@ -51,7 +51,8 @@ place to check what's next, not two that can drift out of sync.
    what Engineering Knowledge actually is),
    [`ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md),
    [`DOMAIN_MODEL.md`](docs/architecture/DOMAIN_MODEL.md),
-   [`DATABASE.md`](docs/architecture/DATABASE.md), and
+   [`DATABASE.md`](docs/architecture/DATABASE.md),
+   [`INTERFACES.md`](docs/architecture/INTERFACES.md), and
    [`CLI.md`](docs/cli/CLI.md)
 2. Significant design → open an RFC under `rfcs/` (start from `0000-template.md`)
 3. Org-wide decisions also land in [`engineering/ADR/`](../engineering/ADR/)
@@ -78,7 +79,7 @@ ai-memory/
 ├── go.mod
 ├── rfcs/               ← design proposals (0001: Engineering Memory Kernel)
 ├── docs/
-│   ├── architecture/   ← KNOWLEDGE_MODEL.md, ARCHITECTURE.md, DOMAIN_MODEL.md, DATABASE.md
+│   ├── architecture/   ← KNOWLEDGE_MODEL.md, ARCHITECTURE.md, DOMAIN_MODEL.md, DATABASE.md, INTERFACES.md
 │   ├── cli/            ← CLI.md
 │   └── api/ storage/ search/ sdk/ plugins/ examples/   ← reserved
 ├── cmd/eng/            ← CLI entrypoint (`eng version` only, so far)
