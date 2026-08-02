@@ -101,18 +101,22 @@ runs locally against files already on disk.
 
 ### CLI
 
-Five commands for v0.1:
+Seven commands for v0.1 (revised from an earlier five-command draft — `add`
+and `doctor` earn their place once a Workspace spans multiple repos; see
+[`CLI.md`](../CLI.md) for the full reconciliation):
 
 ```
 eng init      # create a workspace + local SQLite index in the current repo
-eng index     # walk the repo, parse docs, populate the index
+eng add PATH  # register another repository into the current workspace
+eng index     # walk registered repos, parse docs, populate the index
 eng search Q  # ranked full-text search, returns file + score + related files
 eng ask Q     # retrieval bundle: relevant docs assembled by heuristics, no LLM
 eng status    # index health: doc count, staleness, last index time
+eng doctor    # diagnose a broken index (orphaned rows, missing repo paths)
 ```
 
-Detailed usage, flags, and output shapes are deferred to `CLI.md` (Thursday's
-deliverable) so this RFC stays about scope, not syntax.
+Detailed usage, flags, and output shapes live in [`CLI.md`](../CLI.md) so
+this RFC stays about scope, not syntax.
 
 ### Storage
 

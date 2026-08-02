@@ -50,7 +50,8 @@ Tracked company-wide in [`roadmap/NOW.md`](../roadmap/NOW.md).
 ## Contributing
 
 1. Read [`VISION.md`](VISION.md), [`RFC-0001`](RFC/0001-engineering-memory-kernel.md),
-   [`ARCHITECTURE.md`](ARCHITECTURE.md), and [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md)
+   [`ARCHITECTURE.md`](ARCHITECTURE.md), [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md),
+   [`DATABASE.md`](DATABASE.md), and [`CLI.md`](CLI.md)
 2. Significant design → open an RFC under `RFC/` (start from `0000-template.md`)
 3. Org-wide decisions also land in [`engineering/ADR/`](../engineering/ADR/)
 
