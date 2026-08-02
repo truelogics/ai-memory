@@ -384,11 +384,14 @@ kernel:
   shape, producing whatever `Normalizer` can reconcile into
   `CanonicalDocument`. `Collector` and everything after `Normalizer` don't
   change.
-- **New embedding provider** (Milestone 2+): not a named interface yet —
-  attaches between `Chunker`'s output and `Storage`/`Search`, most likely as
-  something `Search` consults alongside full-text ranking. Deliberately
-  undesigned here; naming it now would be guessing at a shape before
-  Milestone 2's actual requirements exist.
+- **New embedding provider** (OpenAI, Ollama, Voyage, Gemini, FastEmbed, …):
+  implement `kernel.EmbeddingProvider` (`Embed`, `Dimensions`) — named and
+  designed in Step 8's Milestone 4, deliberately with zero implementations
+  shipped, so the shape came from what embeddings are used *for* (Milestone
+  5's hybrid search) rather than being copied from whichever provider's SDK
+  got implemented first. `Storage`'s schema has no vector column yet —
+  that's Milestone 5's problem once a real provider exists to size it
+  against.
 - **New storage engine** (SQLite → Postgres): implement `Storage` against
   Postgres. `Indexer`, `Search`, `Retriever`, and the CLI are unaffected —
   none of them touch SQL directly, only the `Storage` interface.
