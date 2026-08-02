@@ -3,7 +3,7 @@ doc: ARCHITECTURE
 audience: [human, agent]
 status: draft
 owner: ai-memory
-last_reviewed: 2026-08-01
+last_reviewed: 2026-08-02
 ---
 
 # Architecture
@@ -12,22 +12,34 @@ last_reviewed: 2026-08-01
 > [RFC-0002](../../rfcs/0002-knowledge-engine.md) (why this pipeline shape),
 > [KNOWLEDGE_MODEL.md](KNOWLEDGE_MODEL.md), and
 > [INTERFACES.md](INTERFACES.md). This describes the v1 kernel only — no AI,
-> no embeddings, no agents. KNOWLEDGE_MODEL.md's Lifecycle names
-> `Collect`/`Normalize` as their own stages; INTERFACES.md gives them their
-> own `Collector`/`Normalizer` interfaces, both with trivial v1
-> implementations (a local file read; a pass-through) since the only Source
-> is a local git repo and the only format is markdown.
+> no embeddings, no agents.
 
 ## Pipeline
 
+This is the one diagram everything else in this repo's docs points back
+to — [KNOWLEDGE_MODEL.md](KNOWLEDGE_MODEL.md)'s Lifecycle and
+[INTERFACES.md](INTERFACES.md)'s nine interfaces are both this same shape,
+described at a different level (Lifecycle: the general, source-agnostic
+version; Interfaces: the Go seam per stage). This is the concrete v1
+instance of both — same stages, named for what they actually are today.
+
 ```
-Developer / CLI
+Filesystem
       │
       ▼
-   Parser         reads files, produces structured Documents
+  Collector       reads a file's bytes off disk
       │
       ▼
-  Indexer         turns Documents into searchable records
+   Parser         turns bytes + path into a structured Document
+      │
+      ▼
+  Normalizer      reconciles Document into one canonical shape (pass-through in v1)
+      │
+      ▼
+  Chunker         splits a Document into Chunks — the unit Search indexes
+      │
+      ▼
+  Indexer         orchestrates the above per file, writes via Storage
       │
       ▼
   Storage         persists records (SQLite)
@@ -39,17 +51,32 @@ Developer / CLI
   Retriever       assembles a question into a bundle of Search results
       │
       ▼
-  CLI output
+  Context         what a consumer gets back — v1: CLI output. Later: an LLM prompt
 ```
 
 Every arrow is a local, synchronous function call. Nothing in this diagram
-makes a network call, calls a model, or leaves the machine.
+makes a network call, calls a model, or leaves the machine. `Filesystem` and
+`Context` are the pipeline's two ends, not components with their own
+interface — `Filesystem` is what v1's `Source` reads from; `Context` is
+whoever calls `Retriever` and does something with the bundle (`cmd/eng`
+today).
 
 ## Components
 
+Full responsibilities for every component below live in
+[INTERFACES.md](INTERFACES.md). This section is the shorter, narrative
+version for the five that are more than a pass-through in v1.
+
+### Collector (`internal/collector`)
+
+Reads a file's raw bytes off disk, given a path `Indexer` found by walking a
+`Repository`. Thin in v1 — a wrapped `os.ReadFile` — but its own seam so a
+future non-filesystem `Collector` (an HTTP call) doesn't require touching
+`Parser`.
+
 ### Parser (`internal/parser`)
 
-Reads a file from disk and produces a `Document` (see
+Takes the bytes `Collector` fetched and produces a `Document` (see
 [DOMAIN_MODEL.md](DOMAIN_MODEL.md)): path, front-matter, body, doc type,
 content hash. v1 parses markdown only. Doc type (`adr`, `rule`, `standard`,
 `roadmap`, `readme`, …) is inferred from front-matter `doc:` field and path
@@ -59,13 +86,27 @@ Responsibility boundary: parsing has no opinion about storage or ranking. It
 turns bytes into a typed struct and nothing else — it doesn't know SQLite
 exists.
 
+### Normalizer (`internal/normalizer`)
+
+Reconciles a `Parser`'s output into one canonical `Document` shape. v1 is a
+pass-through — markdown's `Parser` output already is that shape — kept as
+its own step so a second `Parser` (Milestone 2+) has somewhere to reconcile
+into, instead of `Chunker` needing to special-case every source format.
+
+### Chunker (`internal/chunker`)
+
+Splits a normalized `Document` into `document_chunks` (see
+[DATABASE.md](DATABASE.md)) — the unit `Search` actually indexes, so a query
+returns a matched section instead of "the whole file matched."
+
 ### Indexer (`internal/indexer`)
 
-Walks a `Repository`, invokes the Parser per file, and turns each `Document`
-into the records Storage needs: the document row, its chunks (see Open
-questions in RFC-0001 for what a "chunk" is), and any tags extracted from
-front-matter. Also records `git` metadata available cheaply (last commit,
-author) without doing full history analysis in v1.
+Walks a `Repository`, calling `Collector` → `Parser` → `Normalizer` →
+`Chunker` per file, then writes the resulting records via `Storage`: the
+document row, its chunks, and any tags extracted from front-matter. Also
+records `git` metadata available cheaply (last commit, author) without doing
+full history analysis in v1. Owns incremental-index decisions (skipping
+unchanged files via `content_hash`).
 
 Responsibility boundary: indexing decides *what* gets stored, not *how* it's
 queried later. It writes once per `eng index` run; it never reads back its
@@ -100,9 +141,9 @@ changing.
 
 ### CLI (`cmd/eng`)
 
-Thin layer translating five commands (`init`, `index`, `search`, `ask`,
-`status`) into calls against the components above, plus formatting output for
-a terminal. No business logic lives here — if the CLI were deleted and
+Thin layer translating the seven commands in [`CLI.md`](../cli/CLI.md)
+(`init`, `add`, `index`, `search`, `ask`, `status`, `doctor`) into calls
+against the components above, plus formatting output for a terminal. No business logic lives here — if the CLI were deleted and
 replaced with an HTTP handler tomorrow, none of the components above would
 change.
 

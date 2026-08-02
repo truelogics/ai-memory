@@ -186,27 +186,14 @@ How knowledge flows, end to end:
 Source → Collect → Parse → Normalize → Chunk → Index → Store → Search → Retrieve → Context
 ```
 
-Mapped onto [ARCHITECTURE.md](ARCHITECTURE.md)'s six-component pipeline
-(`Parser → Indexer → Storage → Search → Retriever → CLI output`), so the two
-diagrams aren't read as contradicting each other:
-
-| Lifecycle stage | v1 reality |
-|---|---|
-| Source | Always "a registered Repository" in v1 |
-| Collect | Trivial — reading a file already on disk. Becomes a real step (an HTTP call, an API client) once a non-filesystem Source exists |
-| Parse | ARCHITECTURE.md's Parser |
-| Normalize | No-op in v1 — markdown is already one canonical format. Becomes real once heterogeneous Sources (Slack JSON, a PDF) need converting to one Document shape before Chunk |
-| Chunk | Part of ARCHITECTURE.md's Indexer — produces `document_chunks` rows |
-| Index | ARCHITECTURE.md's Indexer |
-| Store | ARCHITECTURE.md's Storage |
-| Search | ARCHITECTURE.md's Search |
-| Retrieve | ARCHITECTURE.md's Retriever |
-| Context | v1: CLI output. Future: the assembled prompt context Milestone 3's LLM layer consumes — same output, different consumer |
-
-The lifecycle is the more complete mental model; ARCHITECTURE.md's pipeline
-is what v1 actually builds. Collect and Normalize exist as named stages here
-so that when Milestone 2 needs them for real, they have a place to attach
-instead of being invented ad hoc.
+[ARCHITECTURE.md](ARCHITECTURE.md)'s Pipeline diagram is this same shape,
+concretely: `Source` above is named `Filesystem` there (what it actually is
+in v1), and each verb (`Collect`, `Parse`, …) is named for the interface
+that does it (`Collector`, `Parser`, …, per [INTERFACES.md](INTERFACES.md)).
+This is the general, source-agnostic version; ARCHITECTURE.md is the
+concrete v1 instance of it. Only `Normalize` is a no-op in v1 — markdown is
+already one canonical format, so there's nothing to reconcile until a
+second, non-markdown Source exists.
 
 ## Open questions
 
