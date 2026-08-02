@@ -61,6 +61,12 @@ type Storage interface {
 	GetDocument(ctx context.Context, id string) (domain.CanonicalDocument, error)
 	FindDocumentByPath(ctx context.Context, repositoryID, path string) (domain.CanonicalDocument, bool, error)
 	ListDocuments(ctx context.Context, repositoryID string) ([]domain.CanonicalDocument, error)
+	// DeleteDocument removes a document and everything referencing it
+	// (chunks, FTS index, tags, relationships) as explicit application-layer
+	// deletes inside one transaction — not ON DELETE CASCADE (see
+	// DATABASE.md's open question, resolved this way in RFC-0003). The
+	// first hard-delete this kernel performs; `eng sync`'s reason to exist.
+	DeleteDocument(ctx context.Context, documentID string) error
 
 	// Chunks (replaces all chunks for a document — Chunker's strategy,
 	// not Storage's, decides how many and how they're split)

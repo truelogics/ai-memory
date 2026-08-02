@@ -29,6 +29,8 @@ func main() {
 		err = cli.Init(ctx, firstArgOr(args, "."), os.Stdout)
 	case "index":
 		err = cli.Index(ctx, firstArgOr(args, "."), os.Stdout)
+	case "sync":
+		err = cli.Sync(ctx, firstArgOr(args, "."), os.Stdout)
 	case "search":
 		if len(args) == 0 {
 			fmt.Fprintln(os.Stderr, "usage: eng search <query>")
@@ -68,6 +70,7 @@ Commands:
   version         print the eng version
   init [path]     bootstrap a workspace (default: current directory)
   index [path]    index markdown in a repository (default: current directory)
+  sync [path]     incremental re-index using git (default: current directory)
   search <query>  ranked full-text search
   status [path]   report index health
 

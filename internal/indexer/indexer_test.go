@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -276,6 +277,26 @@ func TestIndexEndToEndWithRealComponents(t *testing.T) {
 	}
 }
 
+func runGitCmd(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+func initGitRepo(t *testing.T, dir string) {
+	t.Helper()
+	runGitCmd(t, dir, "init", "-q")
+	runGitCmd(t, dir, "config", "user.email", "test@example.com")
+	runGitCmd(t, dir, "config", "user.name", "Test")
+	runGitCmd(t, dir, "add", ".")
+	runGitCmd(t, dir, "commit", "-q", "-m", "initial")
+}
+
+// TestIndexExtractsRelationships verifies graph.Extract is actually wired
+// into Index (Milestone 1): an RFC that supersedes an earlier one, real
+// components end to end, should produce a stored Relationship.
 func TestIndexExtractsRelationships(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -310,6 +331,115 @@ func TestIndexExtractsRelationships(t *testing.T) {
 // TestSyncEndToEnd exercises Milestone 3 against a real git repo: an
 // initial full Index, then a modify + an add + a delete, then Sync
 // should only touch the changed files and remove the deleted one.
+func TestSyncEndToEnd(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	writeFile(t, dir, "README.md", "# Demo\n\nOriginal content.\n")
+	writeFile(t, dir, "REMOVE_ME.md", "# Going away\n")
+	initGitRepo(t, dir)
+
+	storage := openTestStore(t)
+	repo, err := domain.NewRepository("ws-1", "demo-repo", dir)
+	if err != nil {
+		t.Fatalf("NewRepository: %v", err)
+	}
+	if err := storage.PutRepository(ctx, repo); err != nil {
+		t.Fatalf("PutRepository: %v", err)
+	}
+
+	idx := New(fscollector.New(), []kernel.Parser{mdparser.New()}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage, graph.NewResolver(storage))
+
+	initial, err := idx.Index(ctx, repo)
+	if err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	if initial.Scanned != 2 || initial.Added != 2 {
+		t.Fatalf("initial Index = %+v, want Scanned=2 Added=2", initial)
+	}
+
+	repo, err = storage.GetRepository(ctx, repo.ID)
+	if err != nil {
+		t.Fatalf("GetRepository: %v", err)
+	}
+	if repo.LastIndexedCommit == "" {
+		t.Fatal("expected Index to record LastIndexedCommit via IncrementalCollector.CurrentRef")
+	}
+
+	// Modify README, add a new file, delete REMOVE_ME.md, commit.
+	writeFile(t, dir, "README.md", "# Demo\n\nUpdated content about authentication.\n")
+	writeFile(t, dir, "NEW.md", "# Brand new\n")
+	if err := os.Remove(filepath.Join(dir, "REMOVE_ME.md")); err != nil {
+		t.Fatalf("os.Remove: %v", err)
+	}
+	runGitCmd(t, dir, "add", ".")
+	runGitCmd(t, dir, "commit", "-q", "-m", "second commit")
+
+	syncResult, err := idx.Sync(ctx, repo)
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if syncResult.Scanned != 2 {
+		t.Fatalf("Sync result = %+v, want Scanned=2 (README.md modified + NEW.md added, not REMOVE_ME.md which was deleted)", syncResult)
+	}
+	if syncResult.Updated != 1 || syncResult.Added != 1 || syncResult.Deleted != 1 {
+		t.Fatalf("Sync result = %+v, want Updated=1 Added=1 Deleted=1", syncResult)
+	}
+
+	docs, err := storage.ListDocuments(ctx, repo.ID)
+	if err != nil {
+		t.Fatalf("ListDocuments: %v", err)
+	}
+	if len(docs) != 2 {
+		t.Fatalf("ListDocuments after Sync = %d docs, want 2 (README.md, NEW.md — REMOVE_ME.md gone)", len(docs))
+	}
+
+	state, ok, err := storage.GetIndexState(ctx, repo.ID)
+	if err != nil {
+		t.Fatalf("GetIndexState: %v", err)
+	}
+	if !ok || state.DocumentCount != 2 || state.LastIncrementalIndexAt.IsZero() {
+		t.Fatalf("GetIndexState after Sync = %+v, want DocumentCount=2 and LastIncrementalIndexAt set", state)
+	}
+	if state.LastFullIndexAt.IsZero() {
+		t.Fatal("Sync must preserve LastFullIndexAt from the earlier Index run, not zero it out")
+	}
+
+	matches, err := storage.SearchChunks(ctx, "authentication", kernel.SearchOptions{})
+	if err != nil {
+		t.Fatalf("SearchChunks: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("SearchChunks(authentication) after Sync = %+v, want the updated README content indexed", matches)
+	}
+}
+
+// TestSyncFallsBackToIndexWithoutPriorCommit verifies Sync degrades
+// gracefully to a full Index when LastIndexedCommit is empty (repo has
+// never been indexed).
+func TestSyncFallsBackToIndexWithoutPriorCommit(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	writeFile(t, dir, "README.md", "# Demo\n")
+	initGitRepo(t, dir)
+
+	storage := openTestStore(t)
+	repo, err := domain.NewRepository("ws-1", "demo-repo", dir)
+	if err != nil {
+		t.Fatalf("NewRepository: %v", err)
+	}
+	if err := storage.PutRepository(ctx, repo); err != nil {
+		t.Fatalf("PutRepository: %v", err)
+	}
+
+	idx := New(fscollector.New(), []kernel.Parser{mdparser.New()}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage, nil)
+	result, err := idx.Sync(ctx, repo)
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if result.Scanned != 1 || result.Added != 1 {
+		t.Fatalf("Sync (no prior commit) = %+v, want a full Index (Scanned=1 Added=1)", result)
+	}
+}
 
 func writeFile(t *testing.T, dir, rel, content string) {
 	t.Helper()

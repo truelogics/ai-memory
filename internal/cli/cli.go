@@ -155,6 +155,40 @@ func Index(ctx context.Context, dir string, out io.Writer) error {
 	return nil
 }
 
+// Sync implements `eng sync [path]`: incremental re-index using git as
+// the source of truth for what changed — RFC-0003/GRAPH.md. Falls back
+// to a full Index when the repo has never been indexed or isn't a git
+// repository (Indexer.Sync's own fallback).
+func Sync(ctx context.Context, dir string, out io.Writer) error {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("sync: %w", err)
+	}
+
+	store, err := openStore(absDir, false)
+	if err != nil {
+		return fmt.Errorf("sync: %w", err)
+	}
+	defer store.Close()
+
+	repo, _, err := findOrCreateRepository(ctx, store, absDir)
+	if err != nil {
+		return fmt.Errorf("sync: %w", err)
+	}
+	if err := store.PutRepository(ctx, repo); err != nil {
+		return fmt.Errorf("sync: %w", err)
+	}
+
+	result, err := newIndexer(store).Sync(ctx, repo)
+	if err != nil {
+		return fmt.Errorf("sync: %w", err)
+	}
+
+	fmt.Fprintf(out, "%s: %d scanned, %d added, %d updated, %d unchanged, %d deleted, %d errors\n",
+		repo.Name, result.Scanned, result.Added, result.Updated, result.Unchanged, result.Deleted, result.Errors)
+	return nil
+}
+
 // Search implements `eng search <query>`.
 func Search(ctx context.Context, dir, query string, out io.Writer) error {
 	absDir, err := filepath.Abs(dir)
@@ -225,8 +259,14 @@ func Status(ctx context.Context, dir string, out io.Writer) error {
 		if ok {
 			status = string(state.Status)
 			docs = state.DocumentCount
-			if !state.LastFullIndexAt.IsZero() {
-				lastIndexed = state.LastFullIndexAt.Format("2006-01-02 15:04:05")
+			// Whichever of the two is more recent — a Sync run updates
+			// LastIncrementalIndexAt without touching LastFullIndexAt.
+			last := state.LastFullIndexAt
+			if state.LastIncrementalIndexAt.After(last) {
+				last = state.LastIncrementalIndexAt
+			}
+			if !last.IsZero() {
+				lastIndexed = last.Format("2006-01-02 15:04:05")
 			}
 		}
 		fmt.Fprintf(out, "%-20s %6d  %-19s  %s\n", repo.Name, docs, lastIndexed, status)

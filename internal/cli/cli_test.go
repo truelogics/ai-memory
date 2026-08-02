@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -150,5 +151,67 @@ func TestSearchNoMatches(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "No matches") {
 		t.Errorf("Search output = %q, want 'No matches'", out.String())
+	}
+}
+
+func runGitCmd(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+// TestSyncEndToEnd exercises `eng sync` through the same real-CLI path
+// TestDefinitionOfDone uses for the other four commands — Milestone 3.
+func TestSyncEndToEnd(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	writeFile(t, dir, "README.md", "# Demo\n\nOriginal content.\n")
+	runGitCmd(t, dir, "init", "-q")
+	runGitCmd(t, dir, "config", "user.email", "test@example.com")
+	runGitCmd(t, dir, "config", "user.name", "Test")
+	runGitCmd(t, dir, "add", ".")
+	runGitCmd(t, dir, "commit", "-q", "-m", "initial")
+
+	var out bytes.Buffer
+	if err := Init(ctx, dir, &out); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	out.Reset()
+	if err := Index(ctx, dir, &out); err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	if !strings.Contains(out.String(), "1 added") {
+		t.Fatalf("Index output = %q, want 1 added", out.String())
+	}
+
+	writeFile(t, dir, "README.md", "# Demo\n\nUpdated content about authentication.\n")
+	writeFile(t, dir, "NEW.md", "# New\n")
+	runGitCmd(t, dir, "add", ".")
+	runGitCmd(t, dir, "commit", "-q", "-m", "second")
+
+	out.Reset()
+	if err := Sync(ctx, dir, &out); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if !strings.Contains(out.String(), "1 added") || !strings.Contains(out.String(), "1 updated") {
+		t.Fatalf("Sync output = %q, want 1 added and 1 updated", out.String())
+	}
+
+	out.Reset()
+	if err := Search(ctx, dir, "authentication", &out); err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if !strings.Contains(out.String(), "README.md") {
+		t.Fatalf("Search(authentication) after Sync = %q, want a hit on README.md", out.String())
+	}
+}
+
+func TestSyncWithoutInitFails(t *testing.T) {
+	dir := t.TempDir()
+	var out bytes.Buffer
+	if err := Sync(context.Background(), dir, &out); err == nil {
+		t.Fatal("Sync: expected error when no workspace has been initialized")
 	}
 }
