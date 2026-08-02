@@ -18,7 +18,7 @@ last_reviewed: 2026-08-02
 
 This is the one diagram everything else in this repo's docs points back
 to — [KNOWLEDGE_MODEL.md](KNOWLEDGE_MODEL.md)'s Lifecycle and
-[INTERFACES.md](INTERFACES.md)'s nine interfaces are both this same shape,
+[INTERFACES.md](INTERFACES.md)'s ten interfaces are both this same shape,
 described at a different level (Lifecycle: the general, source-agnostic
 version; Interfaces: the Go seam per stage). This is the concrete v1
 instance of both — same stages, named for what they actually are today.
@@ -48,18 +48,18 @@ Filesystem
    Search         ranked full-text query over Storage
       │
       ▼
-  Retriever       assembles a question into a bundle of Search results
+  Retriever       gathers everything relevant for a task into a bundle
       │
       ▼
-  Context         what a consumer gets back — v1: CLI output. Later: an LLM prompt
+Context Builder   packages the bundle for a consumer — v1: CLI text. Later: an LLM prompt
 ```
 
 Every arrow is a local, synchronous function call. Nothing in this diagram
-makes a network call, calls a model, or leaves the machine. `Filesystem` and
-`Context` are the pipeline's two ends, not components with their own
-interface — `Filesystem` is what v1's `Source` reads from; `Context` is
-whoever calls `Retriever` and does something with the bundle (`cmd/eng`
-today).
+makes a network call, calls a model, or leaves the machine. `Filesystem` is
+the pipeline's one open end, not a component with its own interface —
+it's what v1's `Source` reads from. `Context Builder` is a real component
+(see INTERFACES.md); what it produces (`Context`) is the pipeline's output,
+consumed by `cmd/eng` today.
 
 ## Components
 
@@ -128,16 +128,23 @@ shared tags or same-ADR linkage). This is what `eng search` calls directly.
 
 ### Retriever (`internal/retriever`)
 
-Takes a natural-language question (`eng ask`), not a search query. In v1
-this is deliberately simple: extract keywords, call Search with them, group
-and de-duplicate the results into a labeled bundle (e.g. "Architecture docs",
-"ADRs", "Related PRs" — PRs empty until Milestone 2 ingests them). No
-generation, no synthesis of a prose answer — the value is better *assembly*
-of what Search already found, not new intelligence.
+Gathers everything relevant for a task — not just a search query. v1's only
+task shape is a natural-language question (`eng ask`): extract keywords,
+call Search with them, group and de-duplicate the results into a labeled
+bundle (e.g. "Architecture docs", "ADRs", "Related PRs" — PRs empty until
+Milestone 2 ingests them). No generation, no synthesis of a prose answer —
+the value is better *assembly* of what Search already found, not new
+intelligence. A broader task shape (e.g. "review PR #123") is where this is
+headed, not implemented in v1.
 
-This is the seam where Milestone 3's LLM layer plugs in later: it will call
-Retriever for context and generate prose on top, without Retriever itself
-changing.
+### Context Builder (`internal/contextbuilder`)
+
+Packages a `Retriever` bundle into whatever a consumer needs. v1's only
+consumer is a terminal, so this is thin: formatting the bundle as readable
+CLI output. This is the seam where Milestone 3's LLM layer plugs in later —
+it calls `Context Builder` for a packaged prompt instead of formatting
+`Retriever`'s bundle itself, so `Retriever` never has to know or care what
+its output gets turned into.
 
 ### CLI (`cmd/eng`)
 
@@ -149,8 +156,8 @@ change.
 
 ## Non-goals reflected in this design
 
-- No component here calls out to a model or an embedding API — Search and
-  Retriever are pure functions over Storage.
+- No component here calls out to a model or an embedding API — Search,
+  Retriever, and Context Builder are pure functions over Storage's results.
 - No component assumes a single repo — `Workspace` (see DOMAIN_MODEL.md) can
   span `ai-memory`, `engineering`, `roadmap`, `vision` from day one, even
   though v1 may only be exercised against one repo at a time.
@@ -165,9 +172,10 @@ rewrites:
 - **Milestone 2 (Intelligence):** a `relationships` table and ranking model
   sit between Storage and Search — Search's interface doesn't change, its
   results just get better.
-- **Milestone 3 (AI layer):** a new component calls Retriever for context and
-  an LLM for generation, sitting *after* Retriever in the pipeline, not
-  inside it.
+- **Milestone 3 (AI layer):** a new generation component calls Context
+  Builder for a packaged prompt and an LLM for generation, sitting *after*
+  Context Builder in the pipeline — Retriever and Context Builder don't
+  change.
 - **Milestone 4 (Engineering OS):** PR/planning/bug intelligence are new
   Parsers (PR, Issue) feeding the same Indexer → Storage → Search path.
 

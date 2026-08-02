@@ -16,9 +16,9 @@ resulting_adr:
 [ARCHITECTURE.md](../docs/architecture/ARCHITECTURE.md) and
 [INTERFACES.md](../docs/architecture/INTERFACES.md) already describe *what*
 the v1 pipeline is: `Source → Collector → Parser → Normalizer → Chunker →
-Indexer → Storage → Search → Retriever`. This RFC is the *why* — the
-argument for each stage existing as its own seam, and the alternative each
-one beat. It's written after those docs, not before, because the shape
+Indexer → Storage → Search → Retriever → Context Builder`. This RFC is the
+*why* — the argument for each stage existing as its own seam, and the
+alternative each one beat. It's written after those docs, not before, because the shape
 came first and earned scrutiny second; that scrutiny is recorded here so
 the shape doesn't get quietly reopened later without someone re-deriving
 this reasoning from scratch.
@@ -102,7 +102,7 @@ nothing to do with each other).
 
 ## Proposal
 
-Adopt the pipeline as already specified: nine interfaces, defined with
+Adopt the pipeline as already specified: ten interfaces, defined with
 responsibilities but no methods in
 [INTERFACES.md](../docs/architecture/INTERFACES.md); components and
 boundaries in
@@ -164,7 +164,7 @@ Carried forward from INTERFACES.md, not re-litigated here:
 - Does `Collector` end up merged into `Source` once method signatures make
   the split's cost/benefit concrete, rather than theoretical?
 - Where do cross-cutting concerns (errors, logging, cancellation) attach
-  across these nine interfaces?
+  across these ten interfaces?
 - Does `Chunker` need a pluggable strategy per Knowledge Type from day one,
   or does v1 ship one strategy and revisit once ADRs and READMEs are shown
   to chunk poorly with the same rule?
