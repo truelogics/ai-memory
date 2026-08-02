@@ -114,25 +114,44 @@ func splitFrontMatter(raw []byte) (frontMatter, body []byte) {
 // `audience: [human, agent]` becomes two Tags, since Metadata holds one
 // value per key and lists don't fit that shape). See KNOWLEDGE_MODEL.md §3
 // on the Metadata/Tag split.
+//
+// Decodes via yaml.Node rather than map[string]any specifically to keep
+// each scalar's original source text — `supersedes: 0001` must stay the
+// string "0001", not become YAML's resolved int(1) (dropping the leading
+// zero) and then "1" after fmt.Sprint. internal/graph's numeric reference
+// resolver depends on this formatting surviving unmangled.
 func applyFrontMatter(doc *domain.CanonicalDocument, frontMatter []byte) error {
-	var fm map[string]any
-	if err := yaml.Unmarshal(frontMatter, &fm); err != nil {
+	var root yaml.Node
+	if err := yaml.Unmarshal(frontMatter, &root); err != nil {
 		return err
 	}
-	for k, v := range fm {
-		switch val := v.(type) {
-		case []any:
-			for _, item := range val {
-				tag, err := domain.NewTag(doc.ID, k, fmt.Sprint(item))
+	if len(root.Content) == 0 {
+		return nil // empty front-matter block
+	}
+	mapping := root.Content[0]
+	if mapping.Kind != yaml.MappingNode {
+		return fmt.Errorf("front-matter is not a mapping (got kind %v)", mapping.Kind)
+	}
+
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		key, value := mapping.Content[i], mapping.Content[i+1]
+		switch value.Kind {
+		case yaml.SequenceNode:
+			for _, item := range value.Content {
+				tag, err := domain.NewTag(doc.ID, key.Value, item.Value)
 				if err != nil {
 					return err
 				}
 				doc.Tags = append(doc.Tags, tag)
 			}
-		case nil:
-			// e.g. `supersedes:` left blank — nothing to record.
+		case yaml.ScalarNode:
+			if value.Tag == "!!null" {
+				continue // e.g. `supersedes:` left blank — nothing to record
+			}
+			doc.Metadata.Set(key.Value, value.Value)
 		default:
-			doc.Metadata.Set(k, fmt.Sprint(val))
+			// A nested mapping or anchor/alias — not a shape this repo's
+			// own front-matter uses; skip rather than guess at a stringification.
 		}
 	}
 	return nil

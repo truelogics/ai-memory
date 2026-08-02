@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"strings"
+
+	"github.com/truelogics/ai-memory/internal/cli"
 )
 
 const version = "0.1.0-dev"
@@ -13,24 +17,60 @@ func main() {
 		os.Exit(1)
 	}
 
-	switch os.Args[1] {
+	ctx := context.Background()
+	cmd, args := os.Args[1], os.Args[2:]
+
+	var err error
+	switch cmd {
 	case "version":
 		fmt.Println("eng version " + version)
+		return
+	case "init":
+		err = cli.Init(ctx, firstArgOr(args, "."), os.Stdout)
+	case "index":
+		err = cli.Index(ctx, firstArgOr(args, "."), os.Stdout)
+	case "search":
+		if len(args) == 0 {
+			fmt.Fprintln(os.Stderr, "usage: eng search <query>")
+			os.Exit(1)
+		}
+		err = cli.Search(ctx, ".", strings.Join(args, " "), os.Stdout)
+	case "status":
+		err = cli.Status(ctx, firstArgOr(args, "."), os.Stdout)
+	case "add", "ask", "doctor":
+		fmt.Fprintf(os.Stderr, "eng %s: not yet implemented (see docs/cli/CLI.md)\n", cmd)
+		os.Exit(1)
 	default:
 		printUsage()
 		os.Exit(1)
 	}
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
+	}
+}
+
+func firstArgOr(args []string, fallback string) string {
+	if len(args) > 0 {
+		return args[0]
+	}
+	return fallback
 }
 
 func printUsage() {
 	fmt.Println(`eng - Engineering Memory CLI
 
 Usage:
-  eng <command>
+  eng <command> [args]
 
 Commands:
-  version   print the eng version
+  version         print the eng version
+  init [path]     bootstrap a workspace (default: current directory)
+  index [path]    index markdown in a repository (default: current directory)
+  search <query>  ranked full-text search
+  status [path]   report index health
 
-Planned, not yet implemented (see CLI.md):
-  init, add, index, search, ask, status, doctor`)
+Planned, not yet implemented (see docs/cli/CLI.md):
+  add, ask, doctor`)
 }

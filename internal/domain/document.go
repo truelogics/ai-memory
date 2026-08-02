@@ -68,6 +68,14 @@ type CanonicalDocument struct {
 	IndexedAt     time.Time
 }
 
+// DocumentID computes the same deterministic id NewCanonicalDocument
+// assigns, without constructing a document — for callers (internal/graph's
+// reference resolver, internal/indexer's delete-by-path on sync) that only
+// need to know a document's id given its repository and path.
+func DocumentID(repositoryID, path string) string {
+	return contentID(strings.TrimSpace(repositoryID), strings.TrimSpace(path))
+}
+
 // NewCanonicalDocument validates and constructs a CanonicalDocument. ID is
 // derived from (repositoryID, path) — v1's answer to DATABASE.md's open
 // question on document identity: path-based, not content-hash-based, so a

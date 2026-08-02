@@ -175,3 +175,21 @@ func TestParseIsDeterministicForSameInput(t *testing.T) {
 		t.Fatalf("Parse not deterministic: (%q, %q) != (%q, %q)", a.ID, a.ContentHash, b.ID, b.ContentHash)
 	}
 }
+
+func TestParsePreservesNumericFrontMatterFormatting(t *testing.T) {
+	content := "---\nsupersedes: 0001\ncount: 007\n---\n\nBody.\n"
+	raw, err := domain.NewRawDocument("repo-1", "rfcs/0002-x.md", []byte(content))
+	if err != nil {
+		t.Fatalf("NewRawDocument: %v", err)
+	}
+	doc, err := New().Parse(context.Background(), raw)
+	if err != nil {
+		t.Fatalf("Parse: unexpected error: %v", err)
+	}
+	if v, ok := doc.Metadata.Get("supersedes"); !ok || v != "0001" {
+		t.Fatalf("Metadata[supersedes] = (%q, %v), want (%q, true) — leading zero must survive YAML's numeric resolution", v, ok, "0001")
+	}
+	if v, ok := doc.Metadata.Get("count"); !ok || v != "007" {
+		t.Fatalf("Metadata[count] = (%q, %v), want (%q, true)", v, ok, "007")
+	}
+}

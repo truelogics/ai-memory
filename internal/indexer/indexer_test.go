@@ -12,6 +12,7 @@ import (
 	mdchunker "github.com/truelogics/ai-memory/internal/chunker"
 	fscollector "github.com/truelogics/ai-memory/internal/collector/filesystem"
 	"github.com/truelogics/ai-memory/internal/domain"
+	"github.com/truelogics/ai-memory/internal/graph"
 	"github.com/truelogics/ai-memory/internal/kernel"
 	mdnormalizer "github.com/truelogics/ai-memory/internal/normalizer"
 	mdparser "github.com/truelogics/ai-memory/internal/parser/markdown"
@@ -86,7 +87,7 @@ func TestIndexAddsNewDocuments(t *testing.T) {
 		{SourceID: repo.ID, Path: "a.md", Bytes: []byte("content a")},
 		{SourceID: repo.ID, Path: "b.md", Bytes: []byte("content b")},
 	}}
-	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage, nil)
 
 	result, err := idx.Index(ctx, repo)
 	if err != nil {
@@ -113,7 +114,7 @@ func TestIndexSkipsUnchangedOnSecondRun(t *testing.T) {
 	collector := &stubCollector{docs: []domain.RawDocument{
 		{SourceID: repo.ID, Path: "a.md", Bytes: []byte("stable content")},
 	}}
-	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage, nil)
 
 	if _, err := idx.Index(ctx, repo); err != nil {
 		t.Fatalf("Index (first run): %v", err)
@@ -135,7 +136,7 @@ func TestIndexReportsUpdatedWhenContentChanges(t *testing.T) {
 	collector := &stubCollector{docs: []domain.RawDocument{
 		{SourceID: repo.ID, Path: "a.md", Bytes: []byte("version one")},
 	}}
-	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage, nil)
 	if _, err := idx.Index(ctx, repo); err != nil {
 		t.Fatalf("Index (first run): %v", err)
 	}
@@ -160,7 +161,7 @@ func TestIndexCountsErrorsAndContinuesProcessingOtherFiles(t *testing.T) {
 		{SourceID: repo.ID, Path: "bad.md", Bytes: []byte("boom")},
 	}}
 	parser := &stubParser{fail: map[string]bool{"bad.md": true}}
-	idx := New(collector, []kernel.Parser{parser}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+	idx := New(collector, []kernel.Parser{parser}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage, nil)
 
 	result, err := idx.Index(ctx, repo)
 	if err != nil {
@@ -179,7 +180,7 @@ func TestIndexNoParserMatchCountsAsError(t *testing.T) {
 	collector := &stubCollector{docs: []domain.RawDocument{
 		{SourceID: repo.ID, Path: "unknown.xyz", Bytes: []byte("???")},
 	}}
-	idx := New(collector, []kernel.Parser{refusingParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+	idx := New(collector, []kernel.Parser{refusingParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage, nil)
 
 	result, err := idx.Index(ctx, repo)
 	if err != nil {
@@ -196,7 +197,7 @@ func TestIndexPropagatesCollectorError(t *testing.T) {
 	repo := testRepo(t, storage)
 
 	collector := &stubCollector{err: errors.New("disk on fire")}
-	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage, nil)
 
 	if _, err := idx.Index(ctx, repo); err == nil {
 		t.Fatal("Index: expected error when Collector fails")
@@ -212,7 +213,7 @@ func TestIndexWritesIndexState(t *testing.T) {
 		{SourceID: repo.ID, Path: "a.md", Bytes: []byte("content")},
 	}}
 	fixedNow := time.Date(2026, 8, 2, 9, 0, 0, 0, time.UTC)
-	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage)
+	idx := New(collector, []kernel.Parser{&stubParser{}}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage, nil)
 	idx.Now = func() time.Time { return fixedNow }
 
 	if _, err := idx.Index(ctx, repo); err != nil {
@@ -255,6 +256,7 @@ func TestIndexEndToEndWithRealComponents(t *testing.T) {
 		mdnormalizer.New(),
 		mdchunker.New(mdchunker.StrategyHeading),
 		storage,
+		graph.NewResolver(storage),
 	)
 
 	result, err := idx.Index(ctx, repo)
@@ -273,6 +275,41 @@ func TestIndexEndToEndWithRealComponents(t *testing.T) {
 		t.Fatalf("SearchChunks(authentication) = %+v, want 1 hit on README.md", matches)
 	}
 }
+
+func TestIndexExtractsRelationships(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	writeFile(t, dir, "rfcs/0001-old.md", "---\ndoc: RFC\n---\n\n# Old RFC\n\nOriginal content.\n")
+	writeFile(t, dir, "rfcs/0002-new.md", "---\ndoc: RFC\nsupersedes: 0001\n---\n\n# New RFC\n\nReplacement content.\n")
+
+	storage := openTestStore(t)
+	repo, err := domain.NewRepository("ws-1", "demo-repo", dir)
+	if err != nil {
+		t.Fatalf("NewRepository: %v", err)
+	}
+	if err := storage.PutRepository(ctx, repo); err != nil {
+		t.Fatalf("PutRepository: %v", err)
+	}
+
+	idx := New(fscollector.New(), []kernel.Parser{mdparser.New()}, mdnormalizer.New(), mdchunker.New(mdchunker.StrategyHeading), storage, graph.NewResolver(storage))
+	if _, err := idx.Index(ctx, repo); err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+
+	newDocID := domain.DocumentID(repo.ID, "rfcs/0002-new.md")
+	oldDocID := domain.DocumentID(repo.ID, "rfcs/0001-old.md")
+	rels, err := storage.ListRelationships(ctx, newDocID)
+	if err != nil {
+		t.Fatalf("ListRelationships: %v", err)
+	}
+	if len(rels) != 1 || rels[0].ToDocumentID != oldDocID || rels[0].Type != domain.RelationshipSupersedes {
+		t.Fatalf("ListRelationships(new doc) = %+v, want 1 supersedes edge to the old RFC", rels)
+	}
+}
+
+// TestSyncEndToEnd exercises Milestone 3 against a real git repo: an
+// initial full Index, then a modify + an add + a delete, then Sync
+// should only touch the changed files and remove the deleted one.
 
 func writeFile(t *testing.T, dir, rel, content string) {
 	t.Helper()

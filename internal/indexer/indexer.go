@@ -1,7 +1,8 @@
 // Package indexer implements kernel.Indexer: orchestrates Collector ->
-// Parser -> Normalizer -> Chunker per file, then writes through Storage.
-// Owns incremental-index decisions; does not execute persistence
-// mechanics itself or interpret file formats. See ARCHITECTURE.md.
+// Parser -> Normalizer -> graph.Extract -> Chunker per item, then writes
+// through Storage. Owns incremental-index decisions; does not execute
+// persistence mechanics itself or interpret file formats. See
+// ARCHITECTURE.md and RFC-0003 (relationship extraction).
 package indexer
 
 import (
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/truelogics/ai-memory/internal/domain"
+	"github.com/truelogics/ai-memory/internal/graph"
 	"github.com/truelogics/ai-memory/internal/kernel"
 )
 
@@ -23,20 +25,27 @@ type Indexer struct {
 	Normalizer kernel.Normalizer
 	Chunker    kernel.Chunker
 	Storage    kernel.Storage
+	// Resolver extracts Relationships from a document's front-matter
+	// references (RFC-0003). Nil skips extraction entirely — kept
+	// optional so existing callers/tests that don't care about
+	// relationships aren't forced to wire one up.
+	Resolver kernel.ReferenceResolver
 	// Now is injectable for deterministic tests; defaults to time.Now.
 	Now func() time.Time
 }
 
 var _ kernel.Indexer = (*Indexer)(nil)
 
-// New wires the pipeline components into an Indexer.
-func New(collector kernel.Collector, parsers []kernel.Parser, normalizer kernel.Normalizer, chunker kernel.Chunker, storage kernel.Storage) *Indexer {
+// New wires the pipeline components into an Indexer. resolver may be nil
+// to skip relationship extraction (see Resolver's doc comment).
+func New(collector kernel.Collector, parsers []kernel.Parser, normalizer kernel.Normalizer, chunker kernel.Chunker, storage kernel.Storage, resolver kernel.ReferenceResolver) *Indexer {
 	return &Indexer{
 		Collector:  collector,
 		Parsers:    parsers,
 		Normalizer: normalizer,
 		Chunker:    chunker,
 		Storage:    storage,
+		Resolver:   resolver,
 		Now:        time.Now,
 	}
 }
@@ -66,9 +75,10 @@ func (idx *Indexer) Index(ctx context.Context, repo domain.Repository) (kernel.I
 }
 
 // indexOne runs one RawDocument through Parser -> Normalizer -> (skip if
-// unchanged) -> Chunker -> Storage, updating result as it goes. Errors at
-// any stage count against result.Errors and move on to the next file —
-// one bad file must not abort the whole `eng index` run.
+// unchanged) -> graph.Extract -> Chunker -> Storage, updating result as
+// it goes. Errors at any stage count against result.Errors and move on
+// to the next file — one bad file must not abort the whole `eng index`
+// run.
 func (idx *Indexer) indexOne(ctx context.Context, repo domain.Repository, raw domain.RawDocument, result *kernel.IndexResult) {
 	parser := idx.pickParser(raw)
 	if parser == nil {
@@ -96,6 +106,15 @@ func (idx *Indexer) indexOne(ctx context.Context, repo domain.Repository, raw do
 	if found && doc.ContentHash != "" && existing.ContentHash == doc.ContentHash {
 		result.Unchanged++
 		return
+	}
+
+	if idx.Resolver != nil {
+		rels, err := graph.Extract(ctx, doc, idx.Resolver)
+		if err != nil {
+			result.Errors++
+			return
+		}
+		doc.Relationships = append(doc.Relationships, rels...)
 	}
 
 	chunks, err := idx.Chunker.Chunk(ctx, doc)

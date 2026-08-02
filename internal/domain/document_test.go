@@ -61,3 +61,13 @@ func TestNewCanonicalDocumentIDStableByRepoAndPath(t *testing.T) {
 		t.Fatalf("document ID collided for a different path: %q", a.ID)
 	}
 }
+
+func TestDocumentIDMatchesNewCanonicalDocument(t *testing.T) {
+	doc, err := NewCanonicalDocument("repo-1", "src-1", "README.md")
+	if err != nil {
+		t.Fatalf("NewCanonicalDocument: %v", err)
+	}
+	if got := DocumentID("repo-1", "README.md"); got != doc.ID {
+		t.Fatalf("DocumentID(...) = %q, want %q (matching NewCanonicalDocument)", got, doc.ID)
+	}
+}
