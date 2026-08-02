@@ -1,15 +1,18 @@
 ---
 doc: sdk
 audience: [human, agent]
-status: reserved
+status: living
 owner: ai-memory
 last_reviewed: 2026-08-02
 ---
 
 # sdk/
 
-Docs for a client library, once `pkg/` exposes one — so other Go programs
-(or, later, other languages) can query Engineering Memory without shelling
-out to `eng`.
+Docs for AI Memory's client libraries — so other Go programs can query
+Engineering Memory without shelling out to `eng`.
 
-> **Reserved** — no content yet. `pkg/` has no code yet either.
+- [GO_SDK.md](GO_SDK.md) — `pkg/memory`, the only supported way to import
+  AI Memory from outside this module. See RFC-0004.
+
+Other languages: not yet — no reason to build one until a non-Go consumer
+exists.
