@@ -124,8 +124,10 @@ as storage ones:
 
 - Does Decision stay derived-from-ADR, or become independent once RFCs
   (which may never become ADRs) also need to resolve to a Decision?
-- Is a Document's identity its repo-relative path, or a content hash — this
-  matters once the same conceptual doc can move across repos in a workspace?
+- ~~Is a Document's identity its repo-relative path, or a content hash~~ —
+  **resolved: path-based**, `sha256(repositoryID, path)` (Step 7,
+  `domain.NewCanonicalDocument`). Still an open trade-off across repos in
+  a workspace: the same conceptual doc moving repos gets a new id.
 - Where does a Rule "live" once `engineering/rules/*.yaml` isn't the only
   source of rules — does Rule stay a child of Document, or need its own
   provenance model?

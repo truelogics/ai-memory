@@ -95,9 +95,12 @@ supersession, an ADR referencing a PR (once PRs exist in Milestone 2).
 | `created_at` | timestamp | |
 
 v1 populates this sparsely (explicit links only — e.g. an ADR's
-`supersedes:` field). Inferred relationships and ranking by relationship
-strength are Milestone 2 (per ARCHITECTURE.md's "Where later milestones
-attach").
+`supersedes:` field) — in practice, close to never in Step 7, since
+nothing yet resolves a front-matter reference to a real `documents.id`.
+[RFC-0003](../../rfcs/0003-engineering-intelligence.md)/[GRAPH.md](GRAPH.md)
+design that resolution (`internal/graph`, not yet implemented). Inferred
+relationships and ranking by relationship strength stay later work (per
+ARCHITECTURE.md's "Where later milestones attach").
 
 ### `index_state`
 
@@ -131,16 +134,19 @@ so `eng status` has something real to report.
 
 ## Open questions
 
-- **Incremental indexing.** Does v1 re-index everything on every `eng index`
-  run, or does `content_hash` unlock skipping unchanged files immediately?
-  Leaning toward: skip unchanged files from day one — it's cheap given
-  `content_hash` already exists on `documents`, and it directly informs
-  `index_state.last_incremental_index_at`.
-- **Document id stability.** If path-based, a renamed file becomes a new row
-  and loses its relationship/tag history. If content-hash-based, an edited
-  file becomes a new row instead. Neither is free — this is the same open
-  question as DOMAIN_MODEL.md's, resolved here means picking a default for
-  the `documents.id` column specifically.
+- **Incremental indexing — resolved for "skip reprocessing," open for
+  "skip reading."** `eng index` skips *reprocessing* unchanged files via
+  `content_hash` comparison (implemented, Step 7) — but it still reads
+  and parses every file first to compute that hash. Actually skipping the
+  read is `eng sync`'s job, designed in
+  [RFC-0003](../../rfcs/0003-engineering-intelligence.md)/[GRAPH.md](GRAPH.md),
+  not implemented yet.
+- **Document id stability — resolved: path-based.** `domain.NewCanonicalDocument`
+  derives `documents.id` from `sha256(repositoryID, path)` (Step 7). A
+  renamed file becomes a new row (losing relationship/tag history); an
+  edited file keeps its row. This was an open question in this file and
+  in DOMAIN_MODEL.md; both are now stale on this point — the decision is
+  made and live in code, not still undecided.
 - **One SQLite file per Repository vs. one per Workspace.** Affects whether
   `documents.repository_id` is even needed as a foreign key or whether each
   repo gets an entirely separate database file. RFC-0001 leaves this open;
@@ -155,3 +161,10 @@ so `eng status` has something real to report.
   Documents.** Once Component/Service/Person exist as `entities` rows (see
   KNOWLEDGE_MODEL.md's Core Entities), an edge needs to reference either a
   Document or an Entity. Polymorphic column vs. a union table is open.
+- **No table has an `ON DELETE` clause.** Step 7 never deleted a row —
+  `eng index` only inserts/upserts. `eng sync`
+  ([RFC-0003](../../rfcs/0003-engineering-intelligence.md)/[GRAPH.md](GRAPH.md))
+  is the first feature that needs to remove a `documents` row and
+  everything hanging off it. Whether that's `ON DELETE CASCADE` in the
+  schema or explicit multi-table deletes in `Storage.DeleteDocument` is
+  undecided — see GRAPH.md's Open questions.

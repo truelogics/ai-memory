@@ -202,8 +202,15 @@ second, non-markdown Source exists.
 - When do Component, Service, and Person graduate from DOMAIN_MODEL.md
   concepts to actual `entities` rows in storage — is that the trigger for
   Milestone 2, or does Milestone 2 start elsewhere and entities come later?
+  **Partially answered by [RFC-0003](../../rfcs/0003-engineering-intelligence.md):**
+  Step 8's relationship work (Milestone 1-2) still doesn't add an
+  `entities` table — it only populates Document↔Document edges. This
+  question stays open for Component/Service/Person specifically.
 - Does `relationships` need a polymorphic Document-or-Entity reference now,
-  or is it safe to defer until the first non-Document Entity actually ships?
+  or is it safe to defer until the first non-Document Entity actually
+  ships? **Still deferred** — RFC-0003's graph work is Document↔Document
+  only, so `relationships.from_document_id`/`to_document_id` don't need
+  to change yet.
 - Is "Normalize" ever a real, separate component, or does it always end up
   absorbed into each Source's Parser (i.e., a Slack parser just emits an
   already-normalized Document, the same way the markdown Parser does today)?

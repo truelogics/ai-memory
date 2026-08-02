@@ -10,7 +10,9 @@ last_reviewed: 2026-08-02
 
 > Companion to [RFC-0001](../../rfcs/0001-engineering-memory-kernel.md),
 > [ARCHITECTURE.md](../architecture/ARCHITECTURE.md), and
-> [DATABASE.md](../architecture/DATABASE.md).
+> [DATABASE.md](../architecture/DATABASE.md). `eng sync` (designed in
+> [RFC-0003](../../rfcs/0003-engineering-intelligence.md)) is an eighth,
+> not-yet-implemented command.
 
 ## Note on scope: 5 commands vs. 7
 
@@ -190,6 +192,26 @@ $ eng doctor
 Workspace healthy.
 ```
 
+### `eng sync` *(designed in [RFC-0003](../../rfcs/0003-engineering-intelligence.md)/[GRAPH.md](../architecture/GRAPH.md) — not implemented)*
+
+**Purpose:** Incremental re-index using git as the source of truth for
+what changed since `repository.last_indexed_commit` — skips reading
+unchanged files entirely (`eng index` still reads every file to compute
+its content hash). Also removes rows for files deleted since the last
+sync, which `eng index` deliberately does not do.
+
+**Arguments:** none in v1 — same directory-discovery convention as the
+other commands.
+
+**Output:** same shape as `eng index`, plus a deleted count.
+
+**Example:**
+
+```
+$ eng sync
+ai-memory: 3 scanned, 1 added, 2 updated, 0 unchanged, 1 deleted, 0 errors
+```
+
 ## Conventions
 
 - Exit code `0`: success. `1`: usage/argument error. `2` (doctor only):
@@ -198,4 +220,4 @@ Workspace healthy.
   current directory to `.eng/` — same convention as `.git`.
 - No command in this list makes a network call or reads an API key. If a
   future flag needs one (Milestone 3's AI layer), it's a new command, not a
-  flag bolted onto one of these seven.
+  flag bolted onto one of these eight.

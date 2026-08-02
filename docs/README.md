@@ -16,7 +16,7 @@ accepted RFC's detail gets fleshed out and kept current.
 
 | Folder | Purpose | Status |
 |--------|---------|--------|
-| [architecture/](architecture/) | KNOWLEDGE_MODEL.md (what Engineering Knowledge is), ARCHITECTURE.md, DOMAIN_MODEL.md, DATABASE.md, INTERFACES.md — the v1 kernel design | living |
+| [architecture/](architecture/) | KNOWLEDGE_MODEL.md (what Engineering Knowledge is), ARCHITECTURE.md, DOMAIN_MODEL.md, DATABASE.md, INTERFACES.md, GRAPH.md — the kernel design | living |
 | [cli/](cli/) | CLI.md — command reference | living |
 | [api/](api/) | Query/ingest interfaces for non-CLI consumers | reserved |
 | [storage/](storage/) | Storage engine internals, beyond the schema in `architecture/DATABASE.md` | reserved |

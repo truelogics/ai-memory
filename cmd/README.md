@@ -1,7 +1,7 @@
 ---
 doc: cmd
 audience: [human, agent]
-status: bootstrapped
+status: living
 owner: ai-memory
 last_reviewed: 2026-08-02
 ---
@@ -10,6 +10,7 @@ last_reviewed: 2026-08-02
 
 CLI entrypoints for AI Memory.
 
-> **Bootstrapped, not implemented** — `cmd/eng` builds and runs `eng version`
-> only. The other six commands in [`../docs/cli/CLI.md`](../docs/cli/CLI.md) are designed but
-> not coded; that's Sprint 2.
+> **Kernel MVP implemented.** `cmd/eng` wires `init`, `index`, `search`, and
+> `status` to real components (see [`internal/cli`](../internal/cli/)) —
+> the four [`CLI.md`](../docs/cli/CLI.md) commands Step 7's Definition of
+> Done requires. `add`, `ask`, and `doctor` are designed but not coded yet.

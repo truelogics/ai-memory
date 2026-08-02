@@ -1,7 +1,7 @@
 ---
 doc: ARCHITECTURE
 audience: [human, agent]
-status: draft
+status: living
 owner: ai-memory
 last_reviewed: 2026-08-02
 ---
@@ -13,6 +13,13 @@ last_reviewed: 2026-08-02
 > [KNOWLEDGE_MODEL.md](KNOWLEDGE_MODEL.md), and
 > [INTERFACES.md](INTERFACES.md). This describes the v1 kernel only — no AI,
 > no embeddings, no agents.
+>
+> **Status: implemented.** Every component below has a concrete package
+> under `internal/` (linked in its section) satisfying the interface
+> named here — `eng init`, `eng index`, `eng search`, and `eng status`
+> all work end-to-end. See [`../../CHANGELOG.md`](../../CHANGELOG.md) and
+> [`../../SPRINT_2_REVIEW.md`](../../SPRINT_2_REVIEW.md) for what shipped
+> and what's still a known gap.
 
 ## Pipeline
 
@@ -67,20 +74,22 @@ Full responsibilities for every component below live in
 [INTERFACES.md](INTERFACES.md). This section is the shorter, narrative
 version for the five that are more than a pass-through in v1.
 
-### Collector (`internal/collector`)
+### Collector (`internal/collector/filesystem`)
 
 Reads a file's raw bytes off disk, given a path `Indexer` found by walking a
 `Repository`. Thin in v1 — a wrapped `os.ReadFile` — but its own seam so a
 future non-filesystem `Collector` (an HTTP call) doesn't require touching
 `Parser`.
 
-### Parser (`internal/parser`)
+### Parser (`internal/parser/markdown`)
 
 Takes the bytes `Collector` fetched and produces a `Document` (see
 [DOMAIN_MODEL.md](DOMAIN_MODEL.md)): path, front-matter, body, doc type,
-content hash. v1 parses markdown only. Doc type (`adr`, `rule`, `standard`,
-`roadmap`, `readme`, …) is inferred from front-matter `doc:` field and path
-conventions, falling back to `unknown`.
+content hash. v1 parses markdown only, using goldmark's CommonMark+GFM AST
+(not a regex) so headings, code blocks, links, and tables parse correctly.
+Doc type (`adr`, `rule`, `standard`, `roadmap`, `readme`, …) is inferred
+from front-matter `doc:` field and path conventions, falling back to
+`unknown`.
 
 Responsibility boundary: parsing has no opinion about storage or ranking. It
 turns bytes into a typed struct and nothing else — it doesn't know SQLite
@@ -112,21 +121,28 @@ Responsibility boundary: indexing decides *what* gets stored, not *how* it's
 queried later. It writes once per `eng index` run; it never reads back its
 own output to answer a query.
 
-### Storage (`internal/storage`)
+### Storage (`internal/storage/sqlite`)
 
-SQLite adapter. Owns the schema ([`DATABASE.md`](DATABASE.md)) and all reads/writes.
-Every other component talks to Storage through a narrow interface (e.g.
-`PutDocument`, `PutChunks`, `Query`) — no component reaches into SQLite
-directly except this one, so swapping the backing store later doesn't
-ripple outward.
+SQLite adapter (via `modernc.org/sqlite`, pure Go — no cgo). Owns the schema
+([`DATABASE.md`](DATABASE.md)) and all reads/writes, including the FTS5
+index `Search` queries. Every other component talks to Storage through a
+narrow interface (`PutDocument`, `PutChunks`, `SearchChunks`, …) — no
+component reaches into SQLite directly except this one, so swapping the
+backing store later doesn't ripple outward. `PutDocument` and `PutChunks`
+each write their rows (document + tags + relationships; chunks + FTS
+index) inside one transaction, so a failure partway through can't leave
+half-written state.
 
 ### Search (`internal/search`)
 
 Takes a query string, runs it against Storage's full-text index (SQLite
-FTS5), returns a ranked list: file, score, matched snippet, related files (by
-shared tags or same-ADR linkage). This is what `eng search` calls directly.
+FTS5), returns a ranked list: file, score, matched snippet, related files.
+"Related" tries explicit Relationships first, then falls back to documents
+sharing a non-structural Tag — explicit relationships are rare in v1, since
+nothing auto-populates them from body content yet. This is what
+`eng search` calls directly.
 
-### Retriever (`internal/retriever`)
+### Retriever (not implemented in Step 7 — interface only, `kernel.Retriever`)
 
 Gathers everything relevant for a task — not just a search query. v1's only
 task shape is a natural-language question (`eng ask`): extract keywords,
@@ -135,24 +151,31 @@ bundle (e.g. "Architecture docs", "ADRs", "Related PRs" — PRs empty until
 Milestone 2 ingests them). No generation, no synthesis of a prose answer —
 the value is better *assembly* of what Search already found, not new
 intelligence. A broader task shape (e.g. "review PR #123") is where this is
-headed, not implemented in v1.
+headed, not implemented in v1. Step 7 scoped implementation to `init`,
+`index`, `search`, `status` only — `eng ask` and a concrete Retriever are
+future work.
 
-### Context Builder (`internal/contextbuilder`)
+### Context Builder (not implemented in Step 7 — interface only, `kernel.ContextBuilder`)
 
 Packages a `Retriever` bundle into whatever a consumer needs. v1's only
-consumer is a terminal, so this is thin: formatting the bundle as readable
-CLI output. This is the seam where Milestone 3's LLM layer plugs in later —
-it calls `Context Builder` for a packaged prompt instead of formatting
-`Retriever`'s bundle itself, so `Retriever` never has to know or care what
-its output gets turned into.
+consumer is a terminal, so this would be thin: formatting the bundle as
+readable CLI output. This is the seam where Milestone 3's LLM layer plugs
+in later — it calls `Context Builder` for a packaged prompt instead of
+formatting `Retriever`'s bundle itself, so `Retriever` never has to know or
+care what its output gets turned into. Not implemented in Step 7 for the
+same reason as Retriever.
 
-### CLI (`cmd/eng`)
+### CLI (`cmd/eng`, `internal/cli`)
 
-Thin layer translating the seven commands in [`CLI.md`](../cli/CLI.md)
-(`init`, `add`, `index`, `search`, `ask`, `status`, `doctor`) into calls
-against the components above, plus formatting output for a terminal. No business logic lives here — if the CLI were deleted and
-replaced with an HTTP handler tomorrow, none of the components above would
-change.
+Thin layer translating commands into calls against the components above,
+plus formatting output for a terminal — the actual translation logic lives
+in `internal/cli` so it's testable without spawning the binary; `cmd/eng`
+just parses `os.Args` and calls in. Of the seven commands in
+[`CLI.md`](../cli/CLI.md), four are implemented (`init`, `index`, `search`,
+`status` — Step 7's Definition of Done); `add`, `ask`, `doctor` print "not
+yet implemented" and exit non-zero. No business logic lives in `cmd/eng`
+itself — if it were deleted and replaced with an HTTP handler tomorrow,
+none of the components above would change.
 
 ## Non-goals reflected in this design
 

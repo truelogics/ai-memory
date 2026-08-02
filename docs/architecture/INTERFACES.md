@@ -1,7 +1,7 @@
 ---
 doc: INTERFACES
 audience: [human, agent]
-status: draft
+status: living
 owner: ai-memory
 last_reviewed: 2026-08-02
 ---
@@ -14,10 +14,18 @@ last_reviewed: 2026-08-02
 > exists rather than a simpler shape). Names the Go interface at each
 > pipeline stage — `Source → Collector → Parser → Normalizer → Chunker →
 > Indexer → Storage → Search → Retriever → Context Builder` — so the seam
-> between stages exists before any implementation does. **Design only: no
-> methods, no implementations.** Named input/output *types* are specified
-> below (what a stage receives and produces); actual method signatures and
-> concrete code are Sprint 2 (Step 7).
+> between stages exists before any implementation does.
+>
+> **Status: eight of ten implemented.** This was originally design-only
+> (no methods); Step 7 implemented real method signatures in
+> `internal/kernel` and concrete types for everything except `Retriever`
+> and `Context Builder`, which stayed interface-only since `eng ask` wasn't
+> in Step 7's scope. See the table below for exact package locations.
+>
+> **Step 8 adds one more, `IncrementalCollector`** — an optional interface
+> `Collector` implementations may satisfy, designed (not implemented) in
+> [GRAPH.md](GRAPH.md) alongside `internal/graph`'s relationship
+> extraction and traversal. See [RFC-0003](../../rfcs/0003-engineering-intelligence.md).
 
 ## Why interfaces before implementation
 
@@ -335,25 +343,33 @@ close enough to `Retriever`'s `RetrievalBundle` that this stage is closer to
 `Normalizer` in triviality than to `Parser` in complexity. Still named
 because Milestone 3 needs the seam without touching `Retriever`.
 
-## What v1 actually builds real vs. trivial implementations of
+## What v1 actually builds, and where
 
-| Interface | v1 implementation |
-|---|---|
-| Source | Real — local git repository |
-| Collector | Real, thin — local filesystem read |
-| Parser | Real — markdown |
-| Normalizer | Trivial — pass-through |
-| Chunker | Real |
-| Indexer | Real |
-| Storage | Real |
-| Search | Real |
-| Retriever | Real, heuristic |
-| Context Builder | Real, minimal — text formatting only |
+| Interface | v1 implementation | Package |
+|---|---|---|
+| Source | Real — local git repository | `domain.Repository` (a domain model, not its own package — see INTERFACES.md's own open question below, since resolved: v1 never gave `Source` an independent interface) |
+| Collector | Real, thin — local filesystem read | [`internal/collector/filesystem`](../../internal/collector/filesystem/) |
+| Parser | Real — markdown, goldmark-based | [`internal/parser/markdown`](../../internal/parser/markdown/) |
+| Normalizer | Real, near-trivial — defaults, dedup, path cleaning | [`internal/normalizer`](../../internal/normalizer/) |
+| Chunker | Real — heading/paragraph/fixed-size strategies | [`internal/chunker`](../../internal/chunker/) |
+| Indexer | Real | [`internal/indexer`](../../internal/indexer/) |
+| Storage | Real — SQLite (`modernc.org/sqlite`) | [`internal/storage/sqlite`](../../internal/storage/sqlite/) |
+| Search | Real — FTS5 + related-document lookup | [`internal/search`](../../internal/search/) |
+| Retriever | **Not implemented** — interface only | `internal/kernel` |
+| Context Builder | **Not implemented** — interface only | `internal/kernel` |
 
-Only `Normalizer` is fully trivial in v1. `Context Builder` is real but
-thin, for the same reason `Normalizer` is trivial: there's only one shape
-(markdown in; CLI text out) until a second Source or a second consumer
-exists.
+Two deviations from what this document originally predicted, worth
+recording rather than silently editing away:
+
+- **`Normalizer` turned out not to be fully trivial.** It really does
+  validate identity, deduplicate Tags/Relationships, and clean paths (see
+  its own tests) — "trivial" undersold it. Still no format-reconciliation
+  logic, since there's still only one Parser.
+- **`Retriever` and `Context Builder` are not implemented**, despite this
+  document originally predicting "Real, heuristic" and "Real, minimal."
+  Step 7's actual scope (`eng init/index/search/status`) never needed
+  them — `eng ask` didn't make the cut. The interfaces exist in
+  `internal/kernel` so Milestone 3+ has the seam ready.
 
 ## Extension points
 

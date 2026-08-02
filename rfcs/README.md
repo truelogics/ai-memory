@@ -24,3 +24,4 @@ implementation.
 | 0000 | Template | n/a |
 | [0001](0001-engineering-memory-kernel.md) | Engineering Memory Kernel | draft |
 | [0002](0002-knowledge-engine.md) | Knowledge Engine | draft |
+| [0003](0003-engineering-intelligence.md) | Engineering Intelligence: Relationships, Graph, Incremental Sync | draft |
