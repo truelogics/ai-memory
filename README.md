@@ -47,6 +47,7 @@ place to check what's next, not two that can drift out of sync.
 ## Contributing
 
 1. Read [`RFC-0001`](rfcs/0001-engineering-memory-kernel.md),
+   [`RFC-0002`](rfcs/0002-knowledge-engine.md),
    [`KNOWLEDGE_MODEL.md`](docs/architecture/KNOWLEDGE_MODEL.md) (start here —
    what Engineering Knowledge actually is),
    [`ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md),

@@ -8,11 +8,13 @@ last_reviewed: 2026-08-02
 
 # Interfaces
 
-> Companion to [KNOWLEDGE_MODEL.md](KNOWLEDGE_MODEL.md) (Lifecycle) and
-> [ARCHITECTURE.md](ARCHITECTURE.md) (pipeline). Names the Go interface at
-> each lifecycle stage — `Source → Collector → Parser → Normalizer →
-> Chunker → Indexer → Storage → Search → Retriever` — so the seam between
-> stages exists before any implementation does. **Design only: no methods,
+> Companion to [KNOWLEDGE_MODEL.md](KNOWLEDGE_MODEL.md) (Lifecycle),
+> [ARCHITECTURE.md](ARCHITECTURE.md) (pipeline), and
+> [RFC-0002](../../rfcs/0002-knowledge-engine.md) (why each stage below
+> exists rather than a simpler shape). Names the Go interface at each
+> lifecycle stage — `Source → Collector → Parser → Normalizer → Chunker →
+> Indexer → Storage → Search → Retriever` — so the seam between stages
+> exists before any implementation does. **Design only: no methods,
 > no implementations.** Method signatures and concrete types are Sprint 2.
 
 ## Why interfaces before implementation

@@ -9,6 +9,7 @@ last_reviewed: 2026-08-01
 # Architecture
 
 > Companion to [RFC-0001](../../rfcs/0001-engineering-memory-kernel.md),
+> [RFC-0002](../../rfcs/0002-knowledge-engine.md) (why this pipeline shape),
 > [KNOWLEDGE_MODEL.md](KNOWLEDGE_MODEL.md), and
 > [INTERFACES.md](INTERFACES.md). This describes the v1 kernel only — no AI,
 > no embeddings, no agents. KNOWLEDGE_MODEL.md's Lifecycle names
