@@ -1,19 +1,35 @@
-// Package search implements kernel.Search: ranked full-text query plus
+// Package search implements kernel.Search: ranked full-text query,
+// blended with graph and (optionally) embedding signals, plus
 // related-document enrichment, on top of kernel.Storage's raw FTS5
-// results. See ARCHITECTURE.md's Search component.
+// results. See ARCHITECTURE.md's Search component and RFC-0003 (hybrid
+// search, Milestone 5). The kernel.Search interface itself doesn't
+// change — Storage's schema and ARCHITECTURE.md's "Where later
+// milestones attach" both said results would just get better, not that
+// the seam would.
 package search
 
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/truelogics/ai-memory/internal/domain"
+	"github.com/truelogics/ai-memory/internal/graph"
 	"github.com/truelogics/ai-memory/internal/kernel"
 )
 
 // maxRelated caps how many related documents Search attaches per result,
 // so one heavily-tagged document doesn't drown out the actual match.
 const maxRelated = 5
+
+// candidatePoolMultiplier and minCandidatePool control how many raw
+// keyword hits get pulled before re-ranking and truncating to the
+// requested limit — hybrid ranking needs a wider pool than the final
+// result count to have anything to blend.
+const (
+	candidatePoolMultiplier = 3
+	minCandidatePool        = 20
+)
 
 // statsTagKeys are the structural Tags internal/parser/markdown attaches
 // to nearly every document (heading_count, etc.) — excluded from the
@@ -26,36 +42,72 @@ var statsTagKeys = map[string]bool{
 	"table_count":      true,
 }
 
-// Search implements kernel.Search against a kernel.Storage.
+// Search implements kernel.Search against a kernel.Storage, blended with
+// optional Graph and Embeddings signals — both nil-safe, degrading to
+// pure keyword ranking when unset.
 type Search struct {
 	Storage kernel.Storage
+	// Graph enables the graph-connectivity boost. Nil disables it (score
+	// contribution 0), not an error — see rank.go's graphBoosts.
+	Graph *graph.Graph
+	// Embeddings enables the semantic-similarity signal. Nil disables it
+	// entirely (Milestone 4 shipped no provider, so this is nil in every
+	// real deployment today) — see rank.go's embeddingBoosts.
+	Embeddings kernel.EmbeddingProvider
 }
 
 var _ kernel.Search = (*Search)(nil)
 
-// New returns a Search backed by storage.
+// New returns a Search backed by storage, with no graph or embedding
+// signal configured — equivalent to Step 7's keyword-only Search. Use the
+// struct literal directly to configure Graph/Embeddings.
 func New(storage kernel.Storage) *Search {
 	return &Search{Storage: storage}
 }
 
-// Search implements kernel.Search.
+// Search implements kernel.Search: fetches a wider candidate pool than
+// requested, blends keyword/graph/embedding signals via rank, then
+// truncates to opts.Limit.
 func (s *Search) Search(ctx context.Context, query string, opts kernel.SearchOptions) ([]kernel.SearchResult, error) {
-	matches, err := s.Storage.SearchChunks(ctx, query, opts)
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+
+	poolOpts := opts
+	poolOpts.Limit = limit * candidatePoolMultiplier
+	if poolOpts.Limit < minCandidatePool {
+		poolOpts.Limit = minCandidatePool
+	}
+
+	matches, err := s.Storage.SearchChunks(ctx, query, poolOpts)
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
 	}
+	if len(matches) == 0 {
+		return nil, nil
+	}
 
-	results := make([]kernel.SearchResult, 0, len(matches))
-	for _, m := range matches {
-		related, err := s.relatedDocuments(ctx, m.Document)
+	scored, err := s.rank(ctx, query, matches)
+	if err != nil {
+		return nil, fmt.Errorf("search: %w", err)
+	}
+	sort.SliceStable(scored, func(i, j int) bool { return scored[i].blended > scored[j].blended })
+	if len(scored) > limit {
+		scored = scored[:limit]
+	}
+
+	results := make([]kernel.SearchResult, 0, len(scored))
+	for _, sc := range scored {
+		related, err := s.relatedDocuments(ctx, sc.match.Document)
 		if err != nil {
 			return nil, err
 		}
 		results = append(results, kernel.SearchResult{
-			Document: m.Document,
-			Chunk:    m.Chunk,
-			Score:    m.Score,
-			Snippet:  m.Snippet,
+			Document: sc.match.Document,
+			Chunk:    sc.match.Chunk,
+			Score:    sc.blended,
+			Snippet:  sc.match.Snippet,
 			Related:  related,
 		})
 	}

@@ -202,7 +202,8 @@ func Search(ctx context.Context, dir, query string, out io.Writer) error {
 	}
 	defer store.Close()
 
-	results, err := search.New(store).Search(ctx, query, kernel.SearchOptions{Limit: 10})
+	hybrid := &search.Search{Storage: store, Graph: graph.New(store)}
+	results, err := hybrid.Search(ctx, query, kernel.SearchOptions{Limit: 10})
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
 	}

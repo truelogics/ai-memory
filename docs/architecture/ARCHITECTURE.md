@@ -135,12 +135,19 @@ half-written state.
 
 ### Search (`internal/search`)
 
-Takes a query string, runs it against Storage's full-text index (SQLite
-FTS5), returns a ranked list: file, score, matched snippet, related files.
-"Related" tries explicit Relationships first, then falls back to documents
-sharing a non-structural Tag — explicit relationships are rare in v1, since
-nothing auto-populates them from body content yet. This is what
-`eng search` calls directly.
+Takes a query string, fetches a wider candidate pool than requested from
+Storage's full-text index (SQLite FTS5), then blends signals before
+truncating to the requested count (Step 8, Milestone 5 — "hybrid
+search"): keyword (BM25, normalized), graph (a candidate connected to
+other candidates in the *same* result set is boosted — sparse today,
+since explicit Relationships are still rare), and, only if an
+`EmbeddingProvider` is configured (none is, in any real deployment yet —
+Milestone 4 shipped no provider), semantic similarity. Fixed blend
+weights, not configurable — Milestone 7 is where that's meant to happen.
+Returns a ranked list: file, blended score, matched snippet, related
+files. "Related" tries explicit Relationships first, then falls back to
+documents sharing a non-structural Tag. This is what `eng search` calls
+directly.
 
 ### Retriever (not implemented in Step 7 — interface only, `kernel.Retriever`)
 
