@@ -11,13 +11,16 @@ last_reviewed: 2026-07-30
 Technical documentation for AI Memory — architecture, data model, APIs, and
 integration guides.
 
-> **Status:** documentation only — flesh out as RFC-0001 lands.
+> **Status:** RFC-0001 has landed. High-level architecture and domain model
+> now live at the repo root — [`../ARCHITECTURE.md`](../ARCHITECTURE.md) and
+> [`../DOMAIN_MODEL.md`](../DOMAIN_MODEL.md) — since they're read as often as
+> the README. This folder holds the storage-level and API-level detail that
+> sits underneath those.
 
 ## Index
 
 | Doc | Purpose | Status |
 |-----|---------|--------|
-| [data-model.md](data-model.md) | Entities, relationships, storage | draft |
-| _architecture.md_ | Components and boundaries | planned |
+| [data-model.md](data-model.md) | Storage schema draft (see `DATABASE.md`, pending) | draft |
 | _api.md_ | Query and ingest interfaces | planned |
 | _ingestion.md_ | How sources are parsed and indexed | planned |

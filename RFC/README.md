@@ -22,4 +22,4 @@ implementation.
 | RFC | Title | Status |
 |-----|-------|--------|
 | 0000 | Template | n/a |
-| 0001 | _TBD — core design & data model_ | planned |
+| [0001](0001-engineering-memory-kernel.md) | Engineering Memory Kernel | draft |
