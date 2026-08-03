@@ -124,17 +124,27 @@ func (r *Retriever) Retrieve(ctx context.Context, task string) (kernel.Retrieval
 // yet, and requiring it would zero out an otherwise-good match on
 // "authentication"). Falls back to the raw task if every word was a
 // stopword.
+//
+// Every kept term is quoted (FTS5 phrase syntax) before joining, not
+// passed as a bareword: a term like "readme.md" or "modified:" contains
+// characters FTS5's query grammar treats specially (a bare trailing
+// colon is column-filter syntax; an embedded period breaks bareword
+// parsing entirely) — real failures a consumer's deterministic,
+// non-natural-language task strings hit (RFC-0002's TaskBuilder,
+// ai-review). Quoting sidesteps FTS5 query-syntax parsing altogether;
+// the content tokenizer still splits the quoted phrase the same way it
+// would a bareword, so match behavior for ordinary words is unchanged.
 func keywords(task string) string {
 	words := strings.Fields(strings.ToLower(task))
 	seen := make(map[string]bool, len(words))
 	var kept []string
 	for _, w := range words {
-		w = strings.Trim(w, ".,!?#()[]{}\"'")
+		w = strings.Trim(w, ".,!?#()[]{}\"':;")
 		if w == "" || stopwords[w] || seen[w] {
 			continue
 		}
 		seen[w] = true
-		kept = append(kept, w)
+		kept = append(kept, `"`+strings.ReplaceAll(w, `"`, `""`)+`"`)
 	}
 	if len(kept) == 0 {
 		return task

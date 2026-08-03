@@ -110,7 +110,7 @@ func TestRetrieveNoMatches(t *testing.T) {
 
 func TestKeywordsDropsStopwordsAndUsesOr(t *testing.T) {
 	got := keywords("Review the authentication PR")
-	want := "authentication OR pr"
+	want := `"authentication" OR "pr"`
 	if got != want {
 		t.Fatalf("keywords(...) = %q, want %q", got, want)
 	}
@@ -120,6 +120,22 @@ func TestKeywordsFallsBackToRawTaskWhenAllStopwords(t *testing.T) {
 	got := keywords("the a an")
 	if got != "the a an" {
 		t.Fatalf("keywords(all stopwords) = %q, want the original task unchanged", got)
+	}
+}
+
+// TestKeywordsQuotesTermsWithFTS5SpecialCharacters guards against a real
+// bug a consumer (ai-review's deterministic TaskBuilder, RFC-0002) hit:
+// a task like "Modified: README.md" produced bareword terms "modified:"
+// and "readme.md" — FTS5 parses a trailing colon as its column-filter
+// syntax ("column:term", crashing with "no such column: modified"), and
+// an embedded period breaks bareword query parsing entirely ("syntax
+// error near '.'"). Every term must come back quoted so FTS5 treats it
+// as a literal phrase instead of parsing its punctuation as syntax.
+func TestKeywordsQuotesTermsWithFTS5SpecialCharacters(t *testing.T) {
+	got := keywords("Modified: README.md")
+	want := `"modified" OR "readme.md"`
+	if got != want {
+		t.Fatalf("keywords(%q) = %q, want %q", "Modified: README.md", got, want)
 	}
 }
 
